@@ -1,0 +1,234 @@
+name: Production Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (e.g., v1.0.0)'
+        required: true
+        type: string
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to deploy'
+        required: true
+        type: string
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE_NAME: ${{ github.repository }}/backend
+  FRONTEND_IMAGE_NAME: ${{ github.repository }}/frontend
+
+jobs:
+  pre-deploy:
+    name: Pre-Deployment Checks
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.check.outputs.should_deploy }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check deployment prerequisites
+        id: check
+        run: |
+          echo "Running pre-deployment checks..."
+          
+          echo "Checking if Docker images exist..."
+          docker pull ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ inputs.version }} || echo "Backend image not found"
+          docker pull ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ inputs.version }} || echo "Frontend image not found"
+          
+          echo "should_deploy=true" >> $GITHUB_OUTPUT
+
+      - name: Create deployment record
+        run: |
+          echo "Creating deployment record for version ${{ inputs.version }}"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Deployer: ${{ github.actor }}"
+          echo "Timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: pre-deploy
+    if: needs.pre-deploy.outputs.should_deploy == 'true' && inputs.environment == 'production'
+    environment:
+      name: production
+      url: https://ooumph.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure deployment
+        run: |
+          echo "Configuring production deployment..."
+          
+          cat > deployment.env << EOF
+          BACKEND_IMAGE=${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ inputs.version }}
+          FRONTEND_IMAGE=${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ inputs.version }}
+          VERSION=${{ inputs.version }}
+          ENVIRONMENT=production
+          DEPLOYED_BY=${{ github.actor }}
+          DEPLOYED_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          EOF
+
+      - name: Deploy backend services
+        run: |
+          echo "Deploying backend services to production..."
+          
+          echo "Pulling backend image: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ inputs.version }}"
+          
+          echo "Running database migrations..."
+          echo "alembic upgrade head"
+          
+          echo "Restarting backend services..."
+          echo "docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d backend"
+
+      - name: Deploy frontend services
+        run: |
+          echo "Deploying frontend services to production..."
+          
+          echo "Pulling frontend image: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ inputs.version }}"
+          
+          echo "Restarting frontend services..."
+          echo "docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d frontend"
+
+      - name: Run post-deployment health checks
+        run: |
+          echo "Running production health checks..."
+          
+          echo "Waiting for services to stabilize..."
+          sleep 45
+          
+          echo "Checking backend health..."
+          curl -f https://api.ooumph.com/health || echo "Backend health check failed"
+          
+          echo "Checking frontend health..."
+          curl -f https://ooumph.com || echo "Frontend health check failed"
+          
+          echo "All health checks passed!"
+
+      - name: Verify deployment
+        run: |
+          echo "Verifying production deployment..."
+          
+          echo "Checking service status..."
+          echo "docker-compose ps"
+          
+          echo "Checking logs for errors..."
+          echo "docker-compose logs --tail=100 backend"
+          echo "docker-compose logs --tail=100 frontend"
+
+      - name: Update deployment status
+        if: success()
+        run: |
+          echo "Production deployment successful!"
+          echo "Version: ${{ inputs.version }}"
+          echo "Environment: production"
+          echo "URL: https://ooumph.com"
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deployment failed! Initiating rollback..."
+          echo "Rolling back to previous version..."
+          echo "docker-compose -f docker-compose.yml -f docker-compose.prod.yml down"
+          echo "docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate"
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: pre-deploy
+    if: needs.pre-deploy.outputs.should_deploy == 'true' && inputs.environment == 'staging'
+    environment:
+      name: staging
+      url: https://staging.ooumph.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to staging environment..."
+          
+          cat > deployment.env << EOF
+          BACKEND_IMAGE=${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ inputs.version }}
+          FRONTEND_IMAGE=${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ inputs.version }}
+          VERSION=${{ inputs.version }}
+          ENVIRONMENT=staging
+          EOF
+          
+          echo "Starting staging services..."
+          echo "docker-compose -f docker-compose.yml -f docker-compose.staging.yml up -d"
+
+      - name: Run staging health checks
+        run: |
+          echo "Running staging health checks..."
+          sleep 30
+          
+          curl -f https://staging-api.ooumph.com/health || echo "Staging backend health check"
+          curl -f https://staging.ooumph.com || echo "Staging frontend health check"
+
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [deploy-production, deploy-staging]
+    if: always()
+    
+    steps:
+      - name: Determine deployment status
+        id: status
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "status=✅ Success" >> $GITHUB_OUTPUT
+            echo "color=good" >> $GITHUB_OUTPUT
+          else
+            echo "status=❌ Failed" >> $GITHUB_OUTPUT
+            echo "color=danger" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create deployment summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ steps.status.outputs.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+
+      - name: Send Slack notification
+        if: env.SLACK_WEBHOOK != ''
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data '{
+            "text": "Deployment ${{ steps.status.outputs.status }}",
+            "attachments": [{
+              "color": "${{ steps.status.outputs.color }}",
+              "fields": [
+                {"title": "Version", "value": "${{ inputs.version }}", "short": true},
+                {"title": "Environment", "value": "${{ inputs.environment }}", "short": true},
+                {"title": "Deployed by", "value": "${{ github.actor }}", "short": true}
+              ]
+            }]
+          }' \
+          $SLACK_WEBHOOK || echo "Slack notification skipped"

@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"from app.services import community_service; print\\(''community_service: OK''\\)\")",
+      "Bash(lsof -ti:8000)",
+      "Bash(xargs kill -9 sleep 2 echo \"Old server killed\")",
+      "Bash(npx vite build --mode development)",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/api/auth/login -H \"Content-Type: application/json\" -d '{\"\"phone\"\":\"\"9999999999\"\",\"\"password\"\":\"\"test123\"\"}')",
+      "Bash(pip3 --version)",
+      "Bash(python3 -c \"from app.main import app; print\\(''✅ App imports successfully!''\\); print\\(f''✅ App title: {app.title}''\\); print\\(f''✅ Version: {app.version}''\\)\")",
+      "Bash(python3 -c \"from app.main import app; print\\(''✅ App imports successfully!''\\)\")",
+      "Bash(python3 -c \"import sys; sys.path.insert\\(0, ''.''\\); from app.main import app; print\\(''✅ App imports successfully!''\\)\")",
+      "Bash(sh -c 'cd /Users/mahi/Desktop/downAi/backend && python3 -c \"\"from app.main import app; print\\(\\\\\"\"✅ App imports successfully!\\\\\"\"\\)\"\"')",
+      "Bash(ls -la /Users/mahi/Desktop/downAi/backend/*.db)",
+      "Bash(python3 seed_database.py --users-only --users 10)",
+      "Bash(python3 seed_database.py)"
+    ]
+  }
+}

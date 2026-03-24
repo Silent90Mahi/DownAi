@@ -1,0 +1,48 @@
+# ============================================================================
+# Ooumph Docker Compose - Development Override
+# ============================================================================
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # ============================================================================
+  # Backend - Development Mode
+  # ============================================================================
+  backend:
+    build:
+      target: development
+    environment:
+      - DEBUG=true
+      - RELOAD=true
+      - LOG_LEVEL=debug
+    volumes:
+      - ./backend:/app
+      - ./backend/app:/app/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
+
+  # ============================================================================
+  # Frontend - Development Mode
+  # ============================================================================
+  frontend:
+    build:
+      target: development
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    command: npm run dev -- --host
+
+  # ============================================================================
+  # Include Development Tools
+  # ============================================================================
+  pgadmin:
+    profiles:
+      - development
+
+  redis_commander:
+    profiles:
+      - development
