@@ -1,170 +1,60 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import PropTypes from 'prop-types';
 import { TrendingUp, Package, ShoppingBag, ChevronRight } from 'lucide-react';
 import { recommendationAPI } from '../services/recommendationAPI';
 
-const TrendingProductSkeleton = () => (
-  <div className="flex-shrink-0 w-56 bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
-    <div className="aspect-square w-full bg-gray-200" />
-    <div className="p-3 space-y-2">
-      <div className="h-3 bg-gray-200 rounded w-2/3" />
-      <div className="h-5 bg-gray-200 rounded w-1/2" />
-      <div className="h-3 bg-gray-200 rounded w-full" />
-    </div>
-  </div>
-);
+const glass = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '1.25rem', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' };
 
 const TrendingProducts = ({ district = null, limit = 10 }) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchTrendingProducts();
-  }, [district, limit]);
+  useEffect(() => { fetchTrendingProducts(); }, [district, limit]);
 
   const fetchTrendingProducts = async () => {
     try {
       setLoading(true);
-      setError(null);
-      const response = await recommendationAPI.getTrendingProducts(district, limit);
-      setProducts(response.data || []);
-    } catch (err) {
-      console.error('Failed to fetch trending products:', err);
-      setError('Unable to load trending products');
-    } finally {
-      setLoading(false);
-    }
+      const r = await recommendationAPI.getTrendingProducts(district, limit);
+      setProducts(r.data || []);
+    } catch { console.error('Failed to fetch trending'); }
+    finally { setLoading(false); }
   };
-
-  const handleProductClick = (productId) => {
-    navigate(`/products/${productId}`);
-  };
-
-  const formatPrice = (price) => {
-    if (typeof price === 'number') {
-      return price.toLocaleString('en-IN');
-    }
-    return price;
-  };
-
-  const renderSkeletons = () => (
-    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <TrendingProductSkeleton key={index} />
-      ))}
-    </div>
-  );
-
-  const renderErrorState = () => (
-    <div className="text-center py-10 bg-red-50 rounded-2xl border border-red-100">
-      <p className="text-red-500 font-medium">{error}</p>
-      <button
-        onClick={fetchTrendingProducts}
-        className="mt-3 text-sm text-red-600 hover:text-red-700 font-semibold"
-      >
-        Try Again
-      </button>
-    </div>
-  );
-
-  const renderEmptyState = () => (
-    <div className="text-center py-10 bg-white rounded-2xl border border-gray-100">
-      <TrendingUp className="w-10 h-10 mx-auto text-gray-300 mb-2" />
-      <p className="text-gray-400 font-medium">No trending products yet</p>
-    </div>
-  );
-
-  if (error && !loading) {
-    return renderErrorState();
-  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-[#FF9933]" />
-          <h2 className="text-xl font-bold text-[#333333]">Trending Now</h2>
-          {district && (
-            <span className="text-sm text-gray-400 font-medium">in {district}</span>
-          )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <TrendingUp size={20} style={{ color: '#a78bfa' }} />
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>Trending Now</h2>
+          {district && <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', background: 'rgba(139,92,246,0.1)', padding: '2px 8px', borderRadius: 6 }}>in {district}</span>}
         </div>
-        <button
-          onClick={() => navigate('/marketplace')}
-          className="flex items-center gap-1 text-sm text-[#FF9933] hover:text-[#e68a2e] font-semibold transition"
-        >
-          View All
-          <ChevronRight className="w-4 h-4" />
-        </button>
+        <button onClick={() => navigate('/marketplace')} style={{ background: 'transparent', border: 'none', color: '#c4b5fd', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}>View All <ChevronRight size={14} /></button>
       </div>
 
-      {loading ? (
-        renderSkeletons()
-      ) : products.length === 0 ? (
-        renderEmptyState()
-      ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory">
-          {products.map((product) => (
-            <article
-              key={product.id}
-              onClick={() => handleProductClick(product.id)}
-              className="flex-shrink-0 w-56 bg-white rounded-2xl border border-gray-100 overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-[#FF9933]/30 snap-start group"
-            >
-              <div className="relative aspect-square w-full bg-gray-50 overflow-hidden">
-                {product.image_url ? (
-                  <img
-                    src={product.image_url}
-                    alt={product.name}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
-                    <Package className="w-10 h-10 text-gray-300" />
-                  </div>
-                )}
-
-                {product.order_count !== undefined && (
-                  <div className="absolute top-2 right-2 bg-[#FF9933] text-white px-2 py-1 rounded-full flex items-center gap-1">
-                    <ShoppingBag className="w-3 h-3" />
-                    <span className="text-xs font-bold">
-                      {product.order_count > 999 ? `${(product.order_count / 1000).toFixed(1)}k` : product.order_count}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-3 space-y-2">
-                <h3 className="text-sm font-semibold text-gray-800 line-clamp-2 group-hover:text-[#FF9933] transition">
-                  {product.name}
-                </h3>
-
-                <div className="flex items-baseline gap-1">
-                  <span className="text-sm text-[#138808]">₹</span>
-                  <span className="text-lg font-bold text-[#138808]">
-                    {formatPrice(product.price)}
-                  </span>
+      <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.75rem' }} className="scrollbar-hide">
+        {loading ? [1,2,3,4].map(i => <div key={i} style={{ flexShrink: 0, width: 200, height: 260, ...glass, animation: 'glowPulse 2s infinite' }} />) :
+         products.map(p => (
+          <article key={p.id} onClick={() => navigate(`/products/${p.id}`)} style={{ flexShrink: 0, width: 200, ...glass, cursor: 'pointer', overflow: 'hidden', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+            <div style={{ position: 'relative', height: 160, background: 'rgba(0,0,0,0.2)' }}>
+              {p.image_url ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Package size={36} style={{ color: 'rgba(139,92,246,0.3)' }} /></div>}
+              {p.order_count !== undefined && (
+                <div style={{ position: 'absolute', top: 8, right: 8, background: '#a855f7', color: '#fff', padding: '2px 8px', borderRadius: 99, display: 'flex', alignItems: 'center', gap: 4, boxShadow: '0 0 10px rgba(168,85,247,0.4)', border: '1px solid rgba(255,255,255,0.2)' }}>
+                  <ShoppingBag size={10} />
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>{p.order_count}+ sold</span>
                 </div>
-
-                {product.category && (
-                  <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
-                    {product.category}
-                  </span>
-                )}
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
+              )}
+            </div>
+            <div style={{ padding: '0.75rem' }}>
+              <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 4px', lineClamp: 1, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>{p.name}</h3>
+              <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#a78bfa', marginBottom: 6 }}>₹{p.price?.toLocaleString()}</div>
+              {p.category && <span style={{ fontSize: '0.6rem', fontWeight: 800, color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase' }}>{p.category}</span>}
+            </div>
+          </article>
+        ))}
+      </div>
     </div>
   );
-};
-
-TrendingProducts.propTypes = {
-  district: PropTypes.string,
-  limit: PropTypes.number
 };
 
 export default TrendingProducts;

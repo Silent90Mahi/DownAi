@@ -94,39 +94,49 @@ SYSTEM_PROMPT = """
 You are the Ooumph Agentic Ecosystem Orchestrator.
 You manage the following AI agents:
 
-1. Vaani (वाणी) - Voice Interface Agent
-   - Handles speech-to-text, text-to-speech, and general conversation
+1. Vaani (वाणी) - General Assistant
+   - General conversation and help
    - Multilingual support (English, Telugu, Hindi, Urdu)
    - Always friendly, warm, and helpful
 
-2. Bazaar Buddhi (बाज़ार बुद्धि) - Market Intelligence Agent
+2. Market Expert - Market Intelligence Agent
    - Market demand analysis
    - Price recommendations
    - Seasonal trends
    - Competition analysis
 
-3. Jodi (जोड़ी) - Buyer Matching Agent
-   - Matches SHG products with buyers
-   - Government procurement opportunities
-   - Negotiation support
+3. Order Assistant - Order Management Agent
+   - Order tracking and status
+   - Delivery management
+   - Order cancellation
+   - Order history
 
-4. Samagri (सामग्री) - Raw Material Procurement Agent
+4. Supplier Advisor - Supplier Network Agent
    - Supplier search
    - Bulk purchase coordination
    - Price comparison
+   - Supplier ratings
 
-5. Vishwas (विश्वास) - Trust & Compliance Agent
-   - Trust score information
-   - Audit and compliance
-   - Trust coin balance
-
-6. Sampark (संपर्क) - Community Orchestration Agent
+5. Community Guide - Community Hub Agent
    - Federation hierarchy information
-   - Community alerts
+   - Community posts and alerts
+   - Peer SHG connections
    - District overview
 
+6. Finance Assistant - Wallet & Payments Agent
+   - Trust coin balance
+   - Transaction history
+   - Wallet connections
+   - Payment simulation
+
+7. Support Bot - General Support Agent
+   - App navigation help
+   - Troubleshooting
+   - Feature explanations
+   - Bug reporting
+
 Analyze the user's query and determine which agent is most appropriate.
-Reply with ONLY the agent name: VAANI, BAZAAR, JODI, SAMAGRI, VISHWAS, SAMPARK, or GENERAL.
+Reply with ONLY the agent name: VAANI, BAZAAR, JODI, SAMAGRI, SAMPARK, VISHWAS, SUPPORT, or GENERAL.
 For general queries or greetings, use VAANI.
 """
 
@@ -230,25 +240,29 @@ def keyword_based_routing(query: str) -> str:
     """Fallback keyword-based routing"""
     query_lower = query.lower()
 
-    # Bazaar Buddhi keywords
-    if any(kw in query_lower for kw in ["market", "demand", "price", "sell", "trend", "competition"]):
+    # Market Expert keywords
+    if any(kw in query_lower for kw in ["market", "demand", "price", "sell", "trend", "competition", "pricing", "analyze"]):
         return "BAZAAR"
 
-    # Jodi keywords
-    if any(kw in kw in query_lower for kw in ["buyer", "match", "procurement", "government tender"]):
+    # Order Assistant keywords
+    if any(kw in query_lower for kw in ["order", "delivery", "track", "cancel", "shipment", "shipping", "status"]):
         return "JODI"
 
-    # Samagri keywords
-    if any(kw in query_lower for kw in ["supplier", "raw material", "bulk purchase", "sourcing"]):
+    # Supplier Advisor keywords
+    if any(kw in query_lower for kw in ["supplier", "raw material", "bulk purchase", "sourcing", "materials", "vendor"]):
         return "SAMAGRI"
 
-    # Vishwas keywords
-    if any(kw in query_lower for kw in ["trust", "score", "badge", "coin", "audit"]):
+    # Finance Assistant keywords
+    if any(kw in query_lower for kw in ["trust", "score", "badge", "coin", "wallet", "payment", "balance", "transaction", "redeem"]):
         return "VISHWAS"
 
-    # Sampark keywords
-    if any(kw in query_lower for kw in ["federation", "slf", "tlf", "community", "district"]):
+    # Community Guide keywords
+    if any(kw in query_lower for kw in ["federation", "slf", "tlf", "community", "district", "shg", "post", "comment"]):
         return "SAMPARK"
+
+    # Support Bot keywords
+    if any(kw in query_lower for kw in ["help", "support", "bug", "issue", "problem", "how to", "navigate", "feature"]):
+        return "SUPPORT"
 
     return "VAANI"
 

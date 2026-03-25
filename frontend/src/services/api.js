@@ -1,7 +1,8 @@
 import axios from 'axios';
 
-// API base URL - adjust if backend is on different port
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+// API base URL - use relative path in production (Docker) to go through nginx proxy
+// In development, use the direct backend URL
+const API_BASE_URL = 'http://localhost:8000';
 
 // Create axios instance
 const api = axios.create({
@@ -86,7 +87,12 @@ export const voiceAPI = {
 
 export const productsAPI = {
   create: (data) => api.post('/api/products/', data),
-  getAll: (params) => api.get('/api/products/', { params }),
+  getAll: (params) => {
+    if (typeof params === 'string') {
+      return api.get('/api/products/', { params: { status: params } });
+    }
+    return api.get('/api/products/', { params: params || {} });
+  },
   getById: (id) => api.get(`/api/products/${id}`),
   update: (id, data) => api.put(`/api/products/${id}`, data),
   delete: (id) => api.delete(`/api/products/${id}`),
@@ -146,6 +152,8 @@ export const matchingAPI = {
 export const suppliersAPI = {
   search: (params) => api.get('/api/suppliers/search', { params }),
   getSupplier: (id) => api.get(`/api/suppliers/supplier/${id}`),
+  listSuppliers: (params) => api.get('/api/suppliers/list', { params }),
+  
   createBulkRequest: (data) => api.post('/api/suppliers/bulk-request', data),
   joinBulkRequest: (requestId, quantity) =>
     api.post(`/api/suppliers/bulk-request/${requestId}/join`, null, { params: { quantity } }),
@@ -153,6 +161,21 @@ export const suppliersAPI = {
     api.get(`/api/suppliers/bulk-requests?district=${district || ''}&status=${status}`),
   getPriceTrends: (materialName, district, months = 6) =>
     api.get(`/api/suppliers/price-trends/${materialName}?district=${district}&months=${months}`),
+  
+  getSupplierReviews: (supplierId, limit = 10, offset = 0) =>
+    api.get(`/api/suppliers/supplier/${supplierId}/reviews?limit=${limit}&offset=${offset}`),
+  createReview: (data) => api.post('/api/suppliers/reviews', data),
+  markReviewHelpful: (reviewId) => api.post(`/api/suppliers/reviews/${reviewId}/helpful`),
+  
+  connect: (supplierId, message) => api.post('/api/suppliers/connect', { supplier_id: supplierId, message }),
+  getConnections: (status) => api.get(`/api/suppliers/connections${status ? `?status=${status}` : ''}`),
+  acceptConnection: (connectionId) => api.post(`/api/suppliers/connections/${connectionId}/accept`),
+  rejectConnection: (connectionId) => api.post(`/api/suppliers/connections/${connectionId}/reject`),
+  
+  requestQuote: (data) => api.post('/api/suppliers/quotes', data),
+  getQuotes: (status) => api.get(`/api/suppliers/quotes${status ? `?status=${status}` : ''}`),
+  acceptQuote: (quoteId) => api.post(`/api/suppliers/quotes/${quoteId}/accept`),
+  rejectQuote: (quoteId) => api.post(`/api/suppliers/quotes/${quoteId}/reject`),
 };
 
 // ============================================================================
@@ -258,4 +281,5 @@ export const reportsAPI = {
 // EXPORT
 // ============================================================================
 
+export { api };
 export default api;

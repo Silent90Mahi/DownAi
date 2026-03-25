@@ -14,8 +14,10 @@ import AdminDashboard from './components/AdminDashboard';
 // Lazy load other pages
 import OrdersList from './components/OrdersList';
 import OrderDetail from './components/OrderDetail';
+import Checkout from './components/Checkout';
 import MarketAnalyzer from './components/MarketAnalyzer';
 import SupplierMarket from './components/SupplierMarket';
+import SupplierProfile from './components/SupplierProfile';
 import BuyerMatches from './components/BuyerMatches';
 import Profile from './components/Profile';
 import TrustWallet from './components/TrustWallet';
@@ -189,9 +191,11 @@ function App() {
         <Route path="/products/:productId"       element={isAuthenticated ? <ProductDetail /> : <Navigate to="/login" />} />
         <Route path="/products/:productId/edit"  element={isAuthenticated ? <ProductEdit />   : <Navigate to="/login" />} />
         <Route path="/orders"          element={isAuthenticated ? <OrdersList />     : <Navigate to="/login" />} />
+        <Route path="/checkout"        element={isAuthenticated ? <Checkout />       : <Navigate to="/login" />} />
         <Route path="/orders/:orderId" element={isAuthenticated ? <OrderDetail />   : <Navigate to="/login" />} />
         <Route path="/market-analyzer" element={isAuthenticated ? <MarketAnalyzer />: <Navigate to="/login" />} />
         <Route path="/suppliers"       element={isAuthenticated ? <SupplierMarket />: <Navigate to="/login" />} />
+        <Route path="/suppliers/:supplierId" element={isAuthenticated ? <SupplierProfile />: <Navigate to="/login" />} />
         <Route path="/matches"         element={isAuthenticated ? <BuyerMatches />  : <Navigate to="/login" />} />
         <Route path="/profile"         element={isAuthenticated ? <Profile />       : <Navigate to="/login" />} />
         <Route path="/wallet"          element={isAuthenticated ? <TrustWallet />   : <Navigate to="/login" />} />

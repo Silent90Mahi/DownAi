@@ -52,13 +52,17 @@ COPY --from=dependencies /app/node_modules ./node_modules
 # Copy application code
 COPY . .
 
+# Set empty API URL so frontend uses relative paths (nginx will proxy to backend)
+ARG VITE_API_URL=
+ENV VITE_API_URL=$VITE_API_URL
+
 # Build the application
 RUN npm run build
 
 # ============================================================================
 # Stage 5: Production Serve
 # ============================================================================
-FROM node:${NODE_VERSION}-alpine as production
+FROM nginx:alpine as production
 
 # Copy built files from build stage
 COPY --from=build /app/dist /usr/share/nginx/html

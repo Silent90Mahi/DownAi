@@ -1,131 +1,48 @@
 import { useState, useRef, useCallback } from 'react';
 import { Mic, MicOff } from 'lucide-react';
 
-const VoiceButton = ({
-  onResult,
-  disabled = false,
-  className = ''
-}) => {
+const VoiceButton = ({ onResult, disabled = false, className = '' }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState(null);
-  const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
+  const mrRef = useRef(null);
+  const chunksRef = useRef([]);
   const streamRef = useRef(null);
 
-  const startRecording = useCallback(async () => {
+  const start = useCallback(async () => {
     if (disabled) return;
-
-    setError(null);
-    audioChunksRef.current = [];
-
+    setError(null); chunksRef.current = [];
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
-      });
-
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = s;
+      const mr = new MediaRecorder(s, { mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4' });
+      mrRef.current = mr;
+      mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType });
+        if (onResult) onResult({ blob, language: 'English', mimeType: mr.mimeType });
+        if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
       };
-
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, {
-          type: mediaRecorder.mimeType
-        });
-
-        if (onResult) {
-          onResult({
-            blob: audioBlob,
-            language: 'English',
-            mimeType: mediaRecorder.mimeType
-          });
-        }
-
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
-          streamRef.current = null;
-        }
-      };
-
-      mediaRecorder.start(100);
-      setIsRecording(true);
-    } catch (err) {
-      console.error('Microphone access error:', err);
-      setError(err.message || 'Microphone access denied');
-      setIsRecording(false);
-    }
+      mr.start(100); setIsRecording(true);
+    } catch (err) { setError('Mic access denied'); setIsRecording(false); }
   }, [disabled, onResult]);
 
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  }, [isRecording]);
-
-  const toggleRecording = useCallback(() => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
-  }, [isRecording, startRecording, stopRecording]);
-
-  const baseClasses = `
-    relative w-16 h-16 rounded-full flex items-center justify-center
-    transition-all duration-300 ease-out focus:outline-none focus:ring-4
-    disabled:opacity-50 disabled:cursor-not-allowed
-  `;
-
-  const recordingClasses = isRecording
-    ? 'bg-red-500 hover:bg-red-600 focus:ring-red-300'
-    : 'bg-gradient-to-r from-[#000080] to-[#00004d] hover:from-[#000066] hover:to-[#000040] focus:ring-blue-300';
+  const stop = useCallback(() => { if (mrRef.current && isRecording) { mrRef.current.stop(); setIsRecording(false); } }, [isRecording]);
 
   return (
-    <div className="relative inline-flex">
+    <div style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
       <button
-        onClick={toggleRecording}
+        onClick={() => isRecording ? stop() : start()}
         disabled={disabled}
-        aria-label={isRecording ? 'Stop recording' : 'Start voice recording'}
-        className={`${baseClasses} ${recordingClasses} ${className}`}
+        aria-label={isRecording ? 'Stop' : 'Start'}
+        style={{ width: 56, height: 56, borderRadius: '50%', background: isRecording ? '#ef4444' : 'linear-gradient(135deg,#7c3aed,#a855f7)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer', transition: 'all 0.3s', boxShadow: isRecording ? '0 0 20px rgba(239,68,68,0.4)' : '0 4px 12px rgba(139,92,246,0.3)', zIndex: 2 }}
+        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
       >
-        {isRecording && (
-          <span className="absolute inset-0 rounded-full bg-red-400 animate-ping opacity-75" />
-        )}
-
-        <span className="relative z-10 text-white">
-          {error ? (
-            <MicOff size={28} />
-          ) : isRecording ? (
-            <Mic size={28} className="animate-pulse" />
-          ) : (
-            <Mic size={28} />
-          )}
-        </span>
+        {isRecording && <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: '#ef4444', animation: 'ping 1s cubic-bezier(0,0,0.2,1) infinite', opacity: 0.6 }} />}
+        {isRecording ? <Mic size={24} className="animate-pulse" /> : <Mic size={24} />}
       </button>
-
-      {isRecording && (
-        <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
-          <span className="flex items-center gap-1.5 text-xs font-medium text-red-600">
-            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-            Recording...
-          </span>
-        </div>
-      )}
-
-      {error && !isRecording && (
-        <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
-          <span className="text-xs font-medium text-red-600">
-            Mic access denied
-          </span>
-        </div>
-      )}
+      {isRecording && <span style={{ position: 'absolute', bottom: -24, fontSize: '0.7rem', fontWeight: 700, color: '#fca5a5', whiteSpace: 'nowrap' }}>Listening...</span>}
+      {error && !isRecording && <span style={{ position: 'absolute', bottom: -24, fontSize: '0.7rem', color: '#fca5a5' }}>Deny</span>}
     </div>
   );
 };

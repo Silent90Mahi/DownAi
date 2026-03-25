@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Package, LineChart, ShieldCheck, Coins, ArrowRight, List, TrendingUp, Star } from 'lucide-react';
+import { Package, LineChart, ShieldCheck, Coins, ArrowRight, List, TrendingUp, Star, Users, ShoppingCart, User, Wallet, BarChart3, Truck, GitMerge, Bell, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { analyticsAPI, trustAPI } from '../services/api';
@@ -119,16 +119,16 @@ const Dashboard = () => {
       const analytics = analyticsResp.data;
       const profile = profileResp.data;
       setStats({
-        trustScore:    profile?.trust_score || 50,
-        trustCoins:   profile?.trust_coins || 0,
+        trustScore: profile?.trust_score || 50,
+        trustCoins: profile?.trust_coins || 0,
         activeListings: analytics?.active_listings || 0,
-        revenue:       analytics?.total_revenue ? `₹${analytics.total_revenue.toLocaleString()}` : '₹0',
-        rank:          profile?.trust_badge || 'Bronze',
-        totalOrders:   analytics?.total_orders || 0,
+        revenue: analytics?.total_revenue ? `₹${analytics.total_revenue.toLocaleString()}` : '₹0',
+        rank: profile?.trust_badge || 'Bronze',
+        totalOrders: analytics?.total_orders || 0,
         completionRate: analytics?.completion_rate || 0,
       });
     } catch {
-      setStats({ trustScore: 50, trustCoins: 0, activeListings: 0, revenue: '₹0', rank: 'Bronze', totalOrders: 0, completionRate: 0 });
+      setStats({ trustScore: 50, trustCoins: 1, activeListings: 0, revenue: '₹0', rank: 'Bronze', totalOrders: 0, completionRate: 0 });
     } finally {
       setLoading(false);
     }
@@ -150,9 +150,9 @@ const Dashboard = () => {
   );
 
   const rankBadgeStyle = {
-    Gold:   { bg: 'rgba(255,215,0,0.15)',   border: 'rgba(255,215,0,0.4)',   color: '#fcd34d', glow: 'rgba(255,215,0,0.2)' },
+    Gold: { bg: 'rgba(255,215,0,0.15)', border: 'rgba(255,215,0,0.4)', color: '#fcd34d', glow: 'rgba(255,215,0,0.2)' },
     Silver: { bg: 'rgba(192,192,192,0.12)', border: 'rgba(192,192,192,0.3)', color: '#cbd5e1', glow: 'rgba(192,192,192,0.15)' },
-    Bronze: { bg: 'rgba(205,127,50,0.15)',  border: 'rgba(205,127,50,0.35)', color: '#fbbf24', glow: 'rgba(205,127,50,0.2)' },
+    Bronze: { bg: 'rgba(205,127,50,0.15)', border: 'rgba(205,127,50,0.35)', color: '#fbbf24', glow: 'rgba(205,127,50,0.2)' },
   }[stats.rank] || { bg: 'rgba(139,92,246,0.15)', border: 'rgba(139,92,246,0.35)', color: '#c4b5fd', glow: 'rgba(139,92,246,0.2)' };
 
   return (
@@ -219,17 +219,31 @@ const Dashboard = () => {
 
       {/* Stats Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
-        <StatCard label="Trust Score"      value={`${stats.trustScore}/100`}   icon={LineChart}    color="#8b5cf6" delay={100} />
-        <StatCard label="Trust Coins"      value={stats.trustCoins}             icon={Coins}        color="#f59e0b" delay={200} />
-        <StatCard label="Active Listings"  value={stats.activeListings}         icon={Package}      color="#10b981" delay={300} />
-        <StatCard label="Total Revenue"    value={stats.revenue}                icon={TrendingUp}   color="#a855f7" delay={100} />
+        <StatCard label="Trust Score" value={`${stats.trustScore}/100`} icon={LineChart} color="#8b5cf6" delay={100} />
+        <StatCard label="Trust Coins" value={stats.trustCoins} icon={Coins} color="#f59e0b" delay={200} />
+        <StatCard label="Active Listings" value={stats.activeListings} icon={Package} color="#10b981" delay={300} />
+        <StatCard label="Total Revenue" value={stats.revenue} icon={TrendingUp} color="#a855f7" delay={100} />
       </div>
 
       {/* Action Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
-        <ActionCard title="My Products"       subtitle="Manage your listings"                icon={List}       onClick={() => navigate('/my-products')}   accentColor="#10b981" delay={100} />
-        <ActionCard title="Buy Raw Materials" subtitle="Go to Samagri Marketplace"           icon={ArrowRight}  onClick={() => navigate('/marketplace')}    accentColor="#f59e0b" delay={200} />
-        <ActionCard title="Sell Products"     subtitle="List to ONDC & GeM via Agent Jodi"  icon={Star}       onClick={() => navigate('/sell')}           accentColor="#8b5cf6" delay={300} />
+        <ActionCard title="My Products" subtitle="Manage your listings" icon={List} onClick={() => navigate('/my-products')} accentColor="#10b981" delay={100} />
+        <ActionCard title="Buy Raw Materials" subtitle="Go to Samagri Marketplace" icon={ArrowRight} onClick={() => navigate('/marketplace')} accentColor="#f59e0b" delay={200} />
+        <ActionCard title="Sell Products" subtitle="List to ONDC & GeM via Agent Jodi" icon={Star} onClick={() => navigate('/sell')} accentColor="#8b5cf6" delay={300} />
+        <ActionCard title="My Orders" subtitle="Track and manage orders" icon={ShoppingCart} onClick={() => navigate('/orders')} accentColor="#06b6d4" delay={100} />
+        <ActionCard title="Market Analyzer" subtitle="AI-powered market insights" icon={LineChart} onClick={() => navigate('/market-analyzer')} accentColor="#ec4899" delay={200} />
+        <ActionCard title="Supplier Network" subtitle="Find verified suppliers" icon={Truck} onClick={() => navigate('/suppliers')} accentColor="#14b8a6" delay={300} />
+        <ActionCard title="Buyer Matches" subtitle="AI-matched opportunities" icon={GitMerge} onClick={() => navigate('/matches')} accentColor="#f97316" delay={100} />
+        <ActionCard title="Bulk Requests" subtitle="Group buying for savings" icon={Package} onClick={() => navigate('/bulk-requests')} accentColor="#8b5cf6" delay={200} />
+        <ActionCard title="Community Hub" subtitle="Connect with SHGs" icon={Users} onClick={() => navigate('/community')} accentColor="#10b981" delay={300} />
+        <ActionCard title="My Profile" subtitle="Account settings" icon={User} onClick={() => navigate('/profile')} accentColor="#6366f1" delay={100} />
+        <ActionCard title="Trust Wallet" subtitle="View trust coins & history" icon={Wallet} onClick={() => navigate('/wallet')} accentColor="#fbbf24" delay={200} />
+        {user?.role === 'admin' && (
+          <>
+            <ActionCard title="Admin Dashboard" subtitle="System management" icon={Settings} onClick={() => navigate('/admin')} accentColor="#ef4444" delay={300} />
+            <ActionCard title="Reports" subtitle="Analytics & reports" icon={BarChart3} onClick={() => navigate('/reports')} accentColor="#a855f7" delay={100} />
+          </>
+        )}
       </div>
     </div>
   );

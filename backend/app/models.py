@@ -213,7 +213,7 @@ class Order(Base):
 
     # Status
     order_status = Column(SQLEnum(OrderStatus), default=OrderStatus.PLACED, index=True)
-    payment_status = Column(SQLEnum(PaymentStatus), default=PaymentStatus.PENDING, index=True)
+    payment_status = Column(SQLEnum(PaymentStatus), default=PaymentStatus.PENDING)
 
     # Payment
     payment_method = Column(String(50))
@@ -779,3 +779,244 @@ class SyncRecord(Base):
     )
 
     user = relationship("User")
+
+
+# ============================================================================
+# COMMUNITY POST MODEL
+# ============================================================================
+class Post(Base):
+    __tablename__ = "posts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    author_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    
+    # Content
+    title = Column(String(200))
+    content = Column(Text, nullable=False)
+    post_type = Column(String(50), default="general")
+    
+    # Media
+    images = Column(JSON)
+    video_url = Column(String(500))
+    
+    # Tags and Category
+    tags = Column(JSON)
+    category = Column(String(50), index=True)
+    
+    # Engagement Stats
+    likes_count = Column(Integer, default=0)
+    comments_count = Column(Integer, default=0)
+    shares_count = Column(Integer, default=0)
+    views_count = Column(Integer, default=0)
+    
+    # Status
+    is_pinned = Column(Boolean, default=False)
+    is_featured = Column(Boolean, default=False)
+    is_announcement = Column(Boolean, default=False)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    author = relationship("User")
+    comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan")
+    likes = relationship("PostLike", back_populates="post", cascade="all, delete-orphan")
+
+
+# ============================================================================
+# COMMENT MODEL
+# ============================================================================
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    post_id = Column(Integer, ForeignKey("posts.id"), nullable=False, index=True)
+    author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    parent_id = Column(Integer, ForeignKey("comments.id"), nullable=True)
+    
+    # Content
+    content = Column(Text, nullable=False)
+    
+    # Media
+    image_url = Column(String(500))
+    
+    # Engagement
+    likes_count = Column(Integer, default=0)
+    replies_count = Column(Integer, default=0)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    post = relationship("Post", back_populates="comments")
+    author = relationship("User")
+    replies = relationship("Comment", backref="parent", remote_side=[id])
+    likes = relationship("CommentLike", back_populates="comment", cascade="all, delete-orphan")
+
+
+# ============================================================================
+# POST LIKE MODEL
+# ============================================================================
+class PostLike(Base):
+    __tablename__ = "post_likes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    post_id = Column(Integer, ForeignKey("posts.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    reaction_type = Column(String(20), default="like")
+    
+    # Timestamp
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    post = relationship("Post", back_populates="likes")
+    user = relationship("User")
+    
+    # Unique constraint
+    __table_args__ = (
+        Index('ix_post_likes_unique', 'post_id', 'user_id', unique=True),
+    )
+
+
+# ============================================================================
+# COMMENT LIKE MODEL
+# ============================================================================
+class CommentLike(Base):
+    __tablename__ = "comment_likes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    comment_id = Column(Integer, ForeignKey("comments.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    reaction_type = Column(String(20), default="like")
+    
+    # Timestamp
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    comment = relationship("Comment", back_populates="likes")
+    user = relationship("User")
+    
+    # Unique constraint
+    __table_args__ = (
+        Index('ix_comment_likes_unique', 'comment_id', 'user_id', unique=True),
+    )
+
+
+# ============================================================================
+# SUPPLIER REVIEW MODEL
+# ============================================================================
+class SupplierReview(Base):
+    __tablename__ = "supplier_reviews"
+
+    id = Column(Integer, primary_key=True, index=True)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False, index=True)
+    reviewer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    
+    # Rating (1-5)
+    rating = Column(Integer, nullable=False)
+    
+    # Review Content
+    title = Column(String(200))
+    content = Column(Text)
+    
+    # Rating Breakdown
+    quality_rating = Column(Integer, default=5)
+    delivery_rating = Column(Integer, default=5)
+    communication_rating = Column(Integer, default=5)
+    value_rating = Column(Integer, default=5)
+    
+    # Status
+    is_verified_purchase = Column(Boolean, default=False)
+    is_approved = Column(Boolean, default=True)
+    
+    # Helpful votes
+    helpful_count = Column(Integer, default=0)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    supplier = relationship("Supplier")
+    reviewer = relationship("User")
+    
+    # Unique constraint - one review per user per supplier
+    __table_args__ = (
+        Index('ix_supplier_reviews_unique', 'supplier_id', 'reviewer_id', unique=True),
+    )
+
+
+# ============================================================================
+# SUPPLIER CONNECTION MODEL
+# ============================================================================
+class SupplierConnection(Base):
+    __tablename__ = "supplier_connections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False, index=True)
+    requester_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    
+    # Status
+    status = Column(String(20), default="pending", index=True)  # pending, accepted, rejected, blocked
+    
+    # Connection Details
+    message = Column(Text)
+    response_message = Column(Text)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    responded_at = Column(DateTime(timezone=True))
+    
+    # Relationships
+    supplier = relationship("Supplier")
+    requester = relationship("User")
+    
+    # Unique constraint
+    __table_args__ = (
+        Index('ix_supplier_connections_unique', 'supplier_id', 'requester_id', unique=True),
+    )
+
+
+# ============================================================================
+# QUOTE REQUEST MODEL
+# ============================================================================
+class QuoteRequest(Base):
+    __tablename__ = "quote_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    quote_number = Column(String(50), unique=True, index=True)
+    
+    # Participants
+    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False, index=True)
+    requester_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    
+    # Request Details
+    material_id = Column(Integer, ForeignKey("materials.id"), nullable=True)
+    material_name = Column(String(200), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    unit = Column(String(20), default="piece")
+    
+    # Requirements
+    description = Column(Text)
+    required_by = Column(DateTime(timezone=True))
+    delivery_district = Column(String(50))
+    
+    # Quote Response
+    quoted_price = Column(Float)
+    quoted_total = Column(Float)
+    valid_until = Column(DateTime(timezone=True))
+    notes = Column(Text)
+    
+    # Status
+    status = Column(String(20), default="pending", index=True)  # pending, quoted, accepted, rejected, expired
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    responded_at = Column(DateTime(timezone=True))
+    
+    # Relationships
+    supplier = relationship("Supplier")
+    requester = relationship("User")
+    material = relationship("Material")

@@ -442,7 +442,7 @@ async def get_coin_wallet(user_id: int, db: Session) -> Dict:
     ).scalar()
 
     spent = db.query(
-        func.coalesce(func.sum(abs(models.CoinTransaction.amount)), 0)
+        func.coalesce(func.sum(func.abs(models.CoinTransaction.amount)), 0)
     ).filter(
         and_(
             models.CoinTransaction.user_id == user_id,

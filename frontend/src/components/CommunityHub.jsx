@@ -1,10 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { communityAPI } from '../services/api';
-import { Users, Building2, TrendingUp, MapPin, Megaphone, BarChart3 } from 'lucide-react';
+import { communityAPI, api } from '../services/api';
+import { Users, Building2, TrendingUp, MapPin, Megaphone, BarChart3, MessageCircle, Heart, Share2, Send, Image, X, ChevronDown, ChevronUp } from 'lucide-react';
 
 const glass = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '1.25rem', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' };
+
+const postsAPI = {
+  getAll: (params) => api.get('/posts', { params }),
+  create: (data) => api.post('/posts', data),
+  delete: (id) => api.delete(`/posts/${id}`),
+  toggleLike: (id) => api.post(`/posts/${id}/like`),
+  getComments: (id) => api.get(`/posts/${id}/comments`),
+  createComment: (id, data) => api.post(`/posts/${id}/comments`, data),
+  deleteComment: (postId, commentId) => api.delete(`/posts/${postId}/comments/${commentId}`),
+  toggleCommentLike: (postId, commentId) => api.post(`/posts/${postId}/comments/${commentId}/like`),
+};
 
 const CommunityHub = () => {
   const { user, isAdmin } = useAuth();
@@ -13,9 +24,19 @@ const CommunityHub = () => {
   const [districtStats, setDistrictStats] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('hierarchy');
+  const [activeTab, setActiveTab] = useState('posts');
+
+  const [posts, setPosts] = useState([]);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [newPostContent, setNewPostContent] = useState('');
+  const [newPostTitle, setNewPostTitle] = useState('');
+  const [newPostCategory, setNewPostCategory] = useState('general');
+  const [expandedComments, setExpandedComments] = useState({});
+  const [commentInputs, setCommentInputs] = useState({});
+  const [replyInputs, setReplyInputs] = useState({});
 
   useEffect(() => { fetchData(); }, []);
+  useEffect(() => { if (activeTab === 'posts') fetchPosts(); }, [activeTab]);
 
   const fetchData = async () => {
     try {
@@ -30,6 +51,180 @@ const CommunityHub = () => {
       setAnnouncements(announcementsResp.data);
     } catch { console.error('Failed to fetch community data'); }
     finally { setLoading(false); }
+  };
+
+  const fetchPosts = async () => {
+    try {
+      setPostsLoading(true);
+      const response = await postsAPI.getAll({ limit: 50 });
+      setPosts(response.data.items || []);
+    } catch (error) {
+      console.error('Failed to fetch posts:', error);
+    } finally {
+      setPostsLoading(false);
+    }
+  };
+
+  const handleCreatePost = async () => {
+    if (!newPostContent.trim()) return;
+    try {
+      await postsAPI.create({
+        title: newPostTitle || undefined,
+        content: newPostContent,
+        category: newPostCategory,
+        post_type: 'general'
+      });
+      setNewPostContent('');
+      setNewPostTitle('');
+      fetchPosts();
+    } catch (error) {
+      alert('Failed to create post: ' + (error.response?.data?.detail || 'Unknown error'));
+    }
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm('Are you sure you want to delete this post?')) return;
+    try {
+      await postsAPI.delete(postId);
+      fetchPosts();
+    } catch (error) {
+      alert('Failed to delete post');
+    }
+  };
+
+  const handleToggleLike = async (postId) => {
+    try {
+      const response = await postsAPI.toggleLike(postId);
+      setPosts(posts.map(p => p.id === postId ? { 
+        ...p, 
+        is_liked: response.data.liked, 
+        likes_count: response.data.likes_count 
+      } : p));
+    } catch (error) {
+      console.error('Failed to toggle like:', error);
+    }
+  };
+
+  const toggleComments = async (postId) => {
+    if (expandedComments[postId]) {
+      setExpandedComments({ ...expandedComments, [postId]: null });
+    } else {
+      try {
+        const response = await postsAPI.getComments(postId);
+        setExpandedComments({ ...expandedComments, [postId]: response.data });
+      } catch (error) {
+        console.error('Failed to fetch comments:', error);
+      }
+    }
+  };
+
+  const handleAddComment = async (postId, parent_id = null) => {
+    const inputKey = parent_id ? `reply-${parent_id}` : `comment-${postId}`;
+    const content = parent_id ? replyInputs[inputKey] : commentInputs[postId];
+    if (!content?.trim()) return;
+
+    try {
+      await postsAPI.createComment(postId, { content, parent_id });
+      if (parent_id) {
+        setReplyInputs({ ...replyInputs, [inputKey]: '' });
+      } else {
+        setCommentInputs({ ...commentInputs, [postId]: '' });
+      }
+      const response = await postsAPI.getComments(postId);
+      setExpandedComments({ ...expandedComments, [postId]: response.data });
+      setPosts(posts.map(p => p.id === postId ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p));
+    } catch (error) {
+      alert('Failed to add comment');
+    }
+  };
+
+  const handleToggleCommentLike = async (postId, commentId) => {
+    try {
+      await postsAPI.toggleCommentLike(postId, commentId);
+      const response = await postsAPI.getComments(postId);
+      setExpandedComments({ ...expandedComments, [postId]: response.data });
+    } catch (error) {
+      console.error('Failed to toggle comment like:', error);
+    }
+  };
+
+  const handleDeleteComment = async (postId, commentId) => {
+    if (!window.confirm('Delete this comment?')) return;
+    try {
+      await postsAPI.deleteComment(postId, commentId);
+      const response = await postsAPI.getComments(postId);
+      setExpandedComments({ ...expandedComments, [postId]: response.data });
+      setPosts(posts.map(p => p.id === postId ? { ...p, comments_count: Math.max(0, (p.comments_count || 1) - 1) } : p));
+    } catch (error) {
+      alert('Failed to delete comment');
+    }
+  };
+
+  const formatTimeAgo = (dateStr) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = Math.floor((now - date) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const CommentItem = ({ comment, postId }) => {
+    const [showReplyInput, setShowReplyInput] = useState(false);
+    const replyKey = `reply-${comment.id}`;
+
+    return (
+      <div style={{ marginBottom: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #8b5cf6, #a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '0.7rem', fontWeight: 700, color: '#fff' }}>
+            {comment.author_name?.charAt(0)?.toUpperCase() || 'U'}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '0.5rem 0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.8rem' }}>{comment.author_name}</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{formatTimeAgo(comment.created_at)}</span>
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0 }}>{comment.content}</p>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: 4, marginLeft: 8 }}>
+              <button onClick={() => handleToggleCommentLike(postId, comment.id)} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: comment.is_liked ? '#f87171' : 'var(--text-muted)', fontSize: '0.7rem', cursor: 'pointer', padding: 0 }}>
+                <Heart size={12} fill={comment.is_liked ? '#f87171' : 'none'} /> {comment.likes_count || 0}
+              </button>
+              <button onClick={() => setShowReplyInput(!showReplyInput)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.7rem', cursor: 'pointer', padding: 0 }}>
+                Reply
+              </button>
+              {comment.author_id === user?.id && (
+                <button onClick={() => handleDeleteComment(postId, comment.id)} style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.7rem', cursor: 'pointer', padding: 0 }}>
+                  Delete
+                </button>
+              )}
+            </div>
+            {showReplyInput && (
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <input
+                  type="text"
+                  value={replyInputs[replyKey] || ''}
+                  onChange={(e) => setReplyInputs({ ...replyInputs, [replyKey]: e.target.value })}
+                  placeholder="Write a reply..."
+                  style={{ flex: 1, padding: '0.4rem 0.6rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 8, color: 'var(--text-primary)', fontSize: '0.8rem' }}
+                />
+                <button onClick={() => handleAddComment(postId, comment.id)} style={{ padding: '0.4rem 0.6rem', background: '#8b5cf6', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer' }}>
+                  <Send size={14} />
+                </button>
+              </div>
+            )}
+            {comment.replies && comment.replies.length > 0 && (
+              <div style={{ marginLeft: '1.5rem', marginTop: '0.5rem', borderLeft: '2px solid rgba(139,92,246,0.2)', paddingLeft: '0.5rem' }}>
+                {comment.replies.map(reply => <CommentItem key={reply.id} comment={reply} postId={postId} />)}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const sendAlert = async () => {
@@ -48,7 +243,7 @@ const CommunityHub = () => {
     </div>
   );
 
-  const TABS = [['hierarchy','Hierarchy'],['announcements','Announcements'],...(isAdmin?[['admin','Admin Actions']]:[])] ;
+  const TABS = [['posts','Community Posts'],['hierarchy','Hierarchy'],['announcements','Announcements'],...(isAdmin?[['admin','Admin Actions']]:[])] ;
   const statCards = [
     { icon: Users,      color: '#8b5cf6', value: districtStats?.total_shgs||0,  label:'Total SHGs' },
     { icon: TrendingUp, color: '#10b981', value: districtStats?.active_shgs||0, label:'Active SHGs' },
@@ -116,6 +311,123 @@ const CommunityHub = () => {
           ))}
         </div>
         <div style={{ padding:'1.25rem' }}>
+          {activeTab === 'posts' && (
+            <div>
+              {/* Create Post */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: 12, padding: '1rem', marginBottom: '1rem' }}>
+                <input
+                  type="text"
+                  value={newPostTitle}
+                  onChange={(e) => setNewPostTitle(e.target.value)}
+                  placeholder="Post title (optional)"
+                  style={{ width: '100%', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 8, color: 'var(--text-primary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}
+                />
+                <textarea
+                  value={newPostContent}
+                  onChange={(e) => setNewPostContent(e.target.value)}
+                  placeholder="What's on your mind?"
+                  rows={3}
+                  style={{ width: '100%', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 8, color: 'var(--text-primary)', fontSize: '0.9rem', resize: 'none', marginBottom: '0.5rem' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <select
+                    value={newPostCategory}
+                    onChange={(e) => setNewPostCategory(e.target.value)}
+                    style={{ padding: '0.4rem 0.6rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 8, color: 'var(--text-primary)', fontSize: '0.8rem' }}
+                  >
+                    <option value="general">General</option>
+                    <option value="discussion">Discussion</option>
+                    <option value="question">Question</option>
+                    <option value="announcement">Announcement</option>
+                    <option value="showcase">Showcase</option>
+                  </select>
+                  <button
+                    onClick={handleCreatePost}
+                    disabled={!newPostContent.trim()}
+                    style={{ padding: '0.5rem 1.25rem', background: newPostContent.trim() ? 'linear-gradient(135deg, #7c3aed, #a855f7)' : 'rgba(139,92,246,0.3)', border: 'none', borderRadius: 8, color: '#fff', fontWeight: 700, cursor: newPostContent.trim() ? 'pointer' : 'not-allowed' }}
+                  >
+                    Post
+                  </button>
+                </div>
+              </div>
+
+              {/* Posts List */}
+              {postsLoading ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Loading posts...</div>
+              ) : posts.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                  <MessageCircle size={48} style={{ margin: '0 auto 0.75rem', opacity: 0.3 }} />
+                  <p>No posts yet. Be the first to share!</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {posts.map((post) => (
+                    <div key={post.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: 12, padding: '1rem' }}>
+                      {/* Post Header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                        <div style={{ display: 'flex', gap: '0.75rem' }}>
+                          <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg, #8b5cf6, #a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#fff' }}>
+                            {post.author_name?.charAt(0)?.toUpperCase() || 'U'}
+                          </div>
+                          <div>
+                            <p style={{ fontWeight: 700, color: 'var(--text-primary)', margin: 0, fontSize: '0.9rem' }}>{post.author_name}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>{formatTimeAgo(post.created_at)} • {post.category || 'General'}</p>
+                          </div>
+                        </div>
+                        {post.author_id === user?.id && (
+                          <button onClick={() => handleDeletePost(post.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 4 }}>
+                            <X size={16} />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Post Content */}
+                      {post.title && <h4 style={{ fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 0.5rem', fontSize: '1rem' }}>{post.title}</h4>}
+                      <p style={{ color: 'var(--text-secondary)', margin: '0 0 0.75rem', fontSize: '0.9rem', lineHeight: 1.5 }}>{post.content}</p>
+
+                      {/* Engagement */}
+                      <div style={{ display: 'flex', gap: '1rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                        <button onClick={() => handleToggleLike(post.id)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: post.is_liked ? '#f87171' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>
+                          <Heart size={18} fill={post.is_liked ? '#f87171' : 'none'} /> {post.likes_count || 0}
+                        </button>
+                        <button onClick={() => toggleComments(post.id)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>
+                          <MessageCircle size={18} /> {post.comments_count || 0}
+                        </button>
+                      </div>
+
+                      {/* Comments Section */}
+                      {expandedComments[postId = post.id] && (
+                        <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                          {/* Add Comment Input */}
+                          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                            <input
+                              type="text"
+                              value={commentInputs[post.id] || ''}
+                              onChange={(e) => setCommentInputs({ ...commentInputs, [post.id]: e.target.value })}
+                              placeholder="Write a comment..."
+                              style={{ flex: 1, padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 8, color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                            />
+                            <button onClick={() => handleAddComment(post.id)} style={{ padding: '0.5rem 0.75rem', background: '#8b5cf6', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer' }}>
+                              <Send size={16} />
+                            </button>
+                          </div>
+
+                          {/* Comments List */}
+                          {expandedComments[post.id].length > 0 ? (
+                            expandedComments[post.id].map(comment => (
+                              <CommentItem key={comment.id} comment={comment} postId={post.id} />
+                            ))
+                          ) : (
+                            <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>No comments yet</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {activeTab==='hierarchy' && overview && (
             <div>
               <h3 style={{ fontWeight:700, color:'var(--text-primary)', marginBottom:'1rem', fontSize:'1rem' }}>Federation Structure</h3>

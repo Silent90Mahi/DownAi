@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { productsAPI, ordersAPI } from '../services/api';
-import { ArrowLeft, Package, MapPin, Phone, User, ShoppingCart, Edit, Trash2, IndianRupee } from 'lucide-react';
+import { ArrowLeft, Package, MapPin, Phone, User, ShoppingCart, Edit, Trash2 } from 'lucide-react';
+
+const glass = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '1.25rem', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' };
 
 const ProductDetail = () => {
   const { productId } = useParams();
@@ -61,7 +63,6 @@ const ProductDetail = () => {
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this product?')) return;
-
     try {
       await productsAPI.delete(productId);
       alert('Product deleted successfully');
@@ -71,175 +72,134 @@ const ProductDetail = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-pulse text-gray-400">Loading product details...</div>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+      <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid rgba(139,92,246,0.2)', borderTopColor: '#8b5cf6', margin: '0 auto 12px', animation: 'spin 0.7s linear infinite' }} />
+      Loading product details...
+    </div>
+  );
 
-  if (!product) {
-    return (
-      <div className="text-center py-20">
-        <p className="text-xl font-semibold text-gray-400">Product not found</p>
-        <button onClick={() => navigate('/marketplace')} className="mt-4 text-[#FF9933] font-semibold">
-          Back to Marketplace
-        </button>
-      </div>
-    );
-  }
+  if (!product) return (
+    <div style={{ textAlign: 'center', padding: '3rem' }}>
+      <p style={{ color: 'var(--text-muted)', marginBottom: 16, fontSize: '1.1rem' }}>Product not found</p>
+      <button onClick={() => navigate('/marketplace')} style={{ color: '#a78bfa', fontWeight: 700, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', padding: '0.6rem 1.25rem', borderRadius: 10, cursor: 'pointer' }}>
+        Back to Marketplace
+      </button>
+    </div>
+  );
 
   const isOwner = product.seller_id === user?.id;
   const totalPrice = product.price * quantity;
 
   return (
-    <div className="space-y-8">
+    <div className="animate-fade-in" style={{ padding: '1.5rem', maxWidth: 1000, margin: '0 auto', paddingBottom: '6rem' }}>
       {/* Back Button */}
       <button
         onClick={() => navigate(-1)}
-        className="flex items-center gap-2 text-gray-600 hover:text-[#FF9933] font-medium transition"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 7, color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.875rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 10, padding: '0.5rem 1rem', cursor: 'pointer', marginBottom: '1.5rem' }}
       >
-        <ArrowLeft className="w-5 h-5" />
-        Back
+        <ArrowLeft size={16} /> Back
       </button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Product Image */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+        {/* Left: Product Media */}
+        <div style={{ ...glass, overflow: 'hidden', height: 'fit-content' }}>
           {product.image_url ? (
-            <img
-              src={product.image_url}
-              alt={product.name}
-              className="w-full h-96 object-cover rounded-xl"
-            />
+            <img src={product.image_url} alt={product.name} style={{ width: '100%', height: 400, objectFit: 'cover' }} />
           ) : (
-            <div className="w-full h-96 bg-gradient-to-br from-[#FF9933]/20 to-[#138808]/20 rounded-xl flex items-center justify-center">
-              <Package className="w-24 h-24 text-[#FF9933]/50" />
+            <div style={{ width: '100%', height: 400, background: 'linear-gradient(135deg,rgba(139,92,246,0.12),rgba(168,85,247,0.08))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Package size={80} style={{ color: 'rgba(139,92,246,0.3)' }} />
             </div>
           )}
         </div>
 
-        {/* Product Info */}
-        <div className="space-y-6">
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div className="flex items-start justify-between mb-4">
-              <span className="px-3 py-1 bg-[#FF9933]/10 text-[#FF9933] rounded-full text-xs font-bold uppercase tracking-wider">
+        {/* Right: Product Info & Actions */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ ...glass, padding: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+              <span style={{ padding: '4px 12px', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', borderRadius: 99, fontSize: '0.7rem', fontWeight: 800, color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 {product.category}
               </span>
               {isOwner && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => navigate(`/products/${product.id}/edit`)}
-                    className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => navigate(`/products/${product.id}/edit`)} style={{ p: 8, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 8, color: '#93c5fd', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '6px' }}><Edit size={16} /></button>
+                  <button onClick={handleDelete} style={{ p: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, color: '#fca5a5', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '6px' }}><Trash2 size={16} /></button>
                 </div>
               )}
             </div>
 
-            <h1 className="text-3xl font-extrabold text-[#333333] mb-2">{product.name}</h1>
-            <p className="text-gray-600 mb-6">{product.description || 'No description available'}</p>
+            <h1 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', margin: '0 0 10px' }}>{product.name}</h1>
+            <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '1.5rem', fontSize: '0.95rem' }}>{product.description || 'No description available'}</p>
 
-            <div className="flex items-baseline gap-3 mb-6">
-              <span className="text-4xl font-black text-[#138808]">₹{product.price?.toLocaleString()}</span>
-              <span className="text-gray-500">per {product.unit}</span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: '1.5rem' }}>
+              <span style={{ fontSize: '2.5rem', fontWeight: 900, color: '#a78bfa' }}>₹{product.price?.toLocaleString()}</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>per {product.unit}</span>
             </div>
 
-            {/* Stock Info */}
-            <div className="grid grid-cols-2 gap-4 pb-6 border-b border-gray-100">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', padding: '1rem 0', borderBlock: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
               <div>
-                <p className="text-sm text-gray-500">Available Stock</p>
-                <p className="text-lg font-bold text-gray-800">{product.quantity} {product.unit}</p>
+                <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Stock Available</p>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-secondary)' }}>{product.quantity} {product.unit}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-500">Status</p>
-                <p className={`text-lg font-bold ${product.status === 'Available' ? 'text-green-600' : 'text-red-600'}`}>
+                <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Status</p>
+                <span style={{ padding: '3px 10px', borderRadius: 99, fontSize: '0.75rem', fontWeight: 800, background: product.status === 'Available' ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', border: `1px solid ${product.status === 'Available' ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`, color: product.status === 'Available' ? '#6ee7b7' : '#fca5a5' }}>
                   {product.status}
-                </p>
+                </span>
               </div>
             </div>
 
-            {/* Quantity Selector */}
             {!isOwner && product.status === 'Available' && (
-              <div className="space-y-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Quantity</label>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="w-10 h-10 bg-gray-100 rounded-lg font-bold hover:bg-gray-200 transition"
-                    >
-                      -
-                    </button>
-                    <input
-                      type="number"
-                      value={quantity}
-                      onChange={(e) => setQuantity(Math.max(1, Math.min(product.quantity, parseInt(e.target.value) || 1)))}
-                      className="w-20 h-10 text-center border border-gray-300 rounded-lg font-bold"
-                    />
-                    <button
-                      onClick={() => setQuantity(Math.min(product.quantity, quantity + 1))}
-                      className="w-10 h-10 bg-gray-100 rounded-lg font-bold hover:bg-gray-200 transition"
-                    >
-                      +
-                    </button>
-                    <span className="text-gray-500 text-sm ml-2">{product.unit}</span>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>Quantity to Order</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 10, overflow: 'hidden' }}>
+                      <button onClick={() => setQuantity(Math.max(1, quantity - 1))} style={{ width: 40, height: 40, border: 'none', background: 'transparent', color: '#fff', fontSize: '1.2rem', cursor: 'pointer', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>-</button>
+                      <input type="number" value={quantity} onChange={e => setQuantity(Math.max(1, Math.min(product.quantity, parseInt(e.target.value) || 1)))} style={{ width: 60, height: 40, border: 'none', background: 'transparent', color: '#fff', textAlign: 'center', fontWeight: 800, fontSize: '1rem', outline: 'none' }} />
+                      <button onClick={() => setQuantity(Math.min(product.quantity, quantity + 1))} style={{ width: 40, height: 40, border: 'none', background: 'transparent', color: '#fff', fontSize: '1.2rem', cursor: 'pointer', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>+</button>
+                    </div>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{product.unit}</span>
                   </div>
                 </div>
 
-                {/* Total Price */}
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Total Amount:</span>
-                    <span className="text-2xl font-bold text-[#138808]">₹{totalPrice.toLocaleString()}</span>
-                  </div>
+                <div style={{ background: 'rgba(139,92,246,0.08)', borderRadius: 12, padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(139,92,246,0.15)' }}>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Total Price:</span>
+                  <span style={{ color: '#c4b5fd', fontWeight: 900, fontSize: '1.3rem' }}>₹{totalPrice.toLocaleString()}</span>
                 </div>
 
-                {/* Order Button */}
-                <button
-                  onClick={handleOrder}
-                  disabled={ordering}
-                  className="w-full py-4 bg-[#138808] text-white rounded-xl font-bold text-lg hover:bg-[#0e6e06] transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  <ShoppingCart className="w-5 h-5" />
-                  {ordering ? 'Processing...' : 'Place Order'}
+                <button onClick={handleOrder} disabled={ordering} style={{ width: '100%', padding: '1rem', background: 'linear-gradient(135deg,#7c3aed,#a855f7)', border: 'none', borderRadius: 12, color: '#fff', fontWeight: 800, fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, boxShadow: '0 4px 15px rgba(139,92,246,0.4)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                  <ShoppingCart size={20} />
+                  {ordering ? 'Processing...' : 'Place Order Now'}
                 </button>
               </div>
             )}
           </div>
 
-          {/* Seller Info */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h2 className="text-lg font-bold text-[#333333] mb-4">Seller Information</h2>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <User className="w-5 h-5 text-gray-400" />
+          {/* Seller / Location Info */}
+          <div style={{ ...glass, padding: '1.25rem' }}>
+            <h2 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1rem' }}>Seller & Logistics</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(139,92,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><User size={18} style={{ color: '#a78bfa' }} /></div>
                 <div>
-                  <p className="text-sm text-gray-500">Seller</p>
-                  <p className="font-semibold text-gray-800">{product.seller_name || 'SHG Member'}</p>
+                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Owned By</p>
+                  <p style={{ fontWeight: 700, color: 'var(--text-secondary)', margin: 0 }}>{product.seller_name || 'SHG Member'}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <MapPin className="w-5 h-5 text-gray-400" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(139,92,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><MapPin size={18} style={{ color: '#a78bfa' }} /></div>
                 <div>
-                  <p className="text-sm text-gray-500">Location</p>
-                  <p className="font-semibold text-gray-800">{product.district || 'Andhra Pradesh'}</p>
+                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>District Location</p>
+                  <p style={{ fontWeight: 700, color: 'var(--text-secondary)', margin: 0 }}>{product.district || 'Andhra Pradesh'}</p>
                 </div>
               </div>
               {!isOwner && (
-                <div className="flex items-center gap-3">
-                  <Phone className="w-5 h-5 text-gray-400" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(139,92,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Phone size={18} style={{ color: '#a78bfa' }} /></div>
                   <div>
-                    <p className="text-sm text-gray-500">Contact</p>
-                    <p className="font-semibold text-gray-800">Available after order confirmation</p>
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Communication</p>
+                    <p style={{ fontWeight: 700, color: 'var(--text-secondary)', margin: 0 }}>Verified via Ooumph Network</p>
                   </div>
                 </div>
               )}

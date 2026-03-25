@@ -661,3 +661,107 @@ class SyncDeltaRequest(BaseModel):
 class SyncDeltaResponse(BaseModel):
     changes: List[SyncRecordResponse]
     timestamp: datetime
+
+
+# ============================================================================
+# SUPPLIER NETWORK SCHEMAS
+# ============================================================================
+class SupplierReviewCreate(BaseModel):
+    supplier_id: int
+    rating: int = Field(..., ge=1, le=5)
+    title: Optional[str] = None
+    content: Optional[str] = None
+    quality_rating: int = Field(5, ge=1, le=5)
+    delivery_rating: int = Field(5, ge=1, le=5)
+    communication_rating: int = Field(5, ge=1, le=5)
+    value_rating: int = Field(5, ge=1, le=5)
+
+class SupplierReviewResponse(BaseModel):
+    id: int
+    supplier_id: int
+    reviewer_id: int
+    reviewer_name: str
+    rating: int
+    title: Optional[str]
+    content: Optional[str]
+    quality_rating: int
+    delivery_rating: int
+    communication_rating: int
+    value_rating: int
+    is_verified_purchase: bool
+    helpful_count: int
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class SupplierConnectionCreate(BaseModel):
+    supplier_id: int
+    message: Optional[str] = None
+
+class SupplierConnectionResponse(BaseModel):
+    id: int
+    supplier_id: int
+    supplier_name: str
+    requester_id: int
+    status: str
+    message: Optional[str]
+    response_message: Optional[str]
+    created_at: datetime
+    responded_at: Optional[datetime]
+    
+    class Config:
+        from_attributes = True
+
+class QuoteRequestCreate(BaseModel):
+    supplier_id: int
+    material_id: Optional[int] = None
+    material_name: str
+    quantity: int
+    unit: str = "piece"
+    description: Optional[str] = None
+    required_by: Optional[datetime] = None
+    delivery_district: Optional[str] = None
+
+class QuoteRequestResponse(BaseModel):
+    id: int
+    quote_number: str
+    supplier_id: int
+    supplier_name: str
+    requester_id: int
+    material_name: str
+    quantity: int
+    unit: str
+    description: Optional[str]
+    required_by: Optional[datetime]
+    delivery_district: Optional[str]
+    quoted_price: Optional[float]
+    quoted_total: Optional[float]
+    valid_until: Optional[datetime]
+    notes: Optional[str]
+    status: str
+    created_at: datetime
+    responded_at: Optional[datetime]
+    
+    class Config:
+        from_attributes = True
+
+class SupplierProfileResponse(BaseModel):
+    id: int
+    business_name: str
+    district: str
+    state: str
+    address: Optional[str]
+    rating: float
+    total_reviews: int
+    trust_score: float
+    is_verified: bool
+    categories_supplied: List[str]
+    service_areas: List[str]
+    total_materials: int
+    total_connections: int
+    recent_reviews: List[SupplierReviewResponse]
+    materials: List[Dict[str, Any]]
+    
+    class Config:
+        from_attributes = True

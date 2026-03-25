@@ -26,10 +26,12 @@ const Marketplace = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await productsAPI.getAll('Available').catch(() => ({ data: [] }));
-      setProducts(response.data || []);
+      const response = await productsAPI.getAll({ status: 'Active' }).catch(() => ({ data: { items: [] } }));
+      const productsData = response.data?.items || response.data || [];
+      setProducts(Array.isArray(productsData) ? productsData : []);
     } catch (error) {
       console.error('Failed to fetch marketplace data:', error);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -185,7 +187,7 @@ const Marketplace = () => {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigate(`/orders?productId=${product.id}`);
+                  navigate(`/checkout?productId=${product.id}`);
                 }}
                 style={{
                   width: '100%', padding: '0.7rem',

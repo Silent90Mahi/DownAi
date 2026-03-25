@@ -12,7 +12,7 @@ from core.config import settings
 from .routers import auth, chat, products, orders, voice
 from .routers import market, matching, suppliers, trust, community
 from .routers import payments, analytics, notifications, reports, websocket, sync
-from .routers import recommendations
+from .routers import recommendations, posts
 
 # Create all database tables
 init_db()
@@ -40,8 +40,8 @@ def is_allowed_origin(origin: str) -> bool:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.ENVIRONMENT == "development" else [settings.FRONTEND_URL],
-    allow_credentials=False if settings.ENVIRONMENT == "development" else True,
+    allow_origins=["*"] if settings.ENVIRONMENT == "development" else [settings.FRONTEND_URL, "http://localhost:3000"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -74,6 +74,7 @@ app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(websocket.router, prefix="/api", tags=["WebSocket"])
 app.include_router(sync.router, prefix="/api/sync", tags=["Offline Sync"])
 app.include_router(recommendations.router, prefix="/api/recommendations", tags=["Recommendations"])
+app.include_router(posts.router, prefix="/api", tags=["Posts"])
 
 @app.get("/")
 def read_root():

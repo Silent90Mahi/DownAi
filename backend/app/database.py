@@ -30,4 +30,4 @@ def get_db():
 def init_db():
     """Initialize database tables"""
     from . import models
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=engine, checkfirst=True)

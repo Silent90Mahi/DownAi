@@ -6,11 +6,11 @@ import { Package, Edit, Trash2, Plus, Eye, TrendingUp, IndianRupee } from 'lucid
 
 const STAT_CONF = [
   { label:'Total Listings', key:null,       fn:p=>p.length,                                       icon:Package,    color:'#8b5cf6' },
-  { label:'Available',      key:'Available', fn:p=>p.filter(x=>x.status==='Available').length,     icon:TrendingUp, color:'#10b981' },
+  { label:'Available',      key:'Active', fn:p=>p.filter(x=>x.status==='Active').length,     icon:TrendingUp, color:'#10b981' },
   { label:'Total Value',    key:null,        fn:p=>`₹${p.reduce((s,x)=>s+(x.price*x.quantity||0),0).toLocaleString()}`, icon:IndianRupee, color:'#a78bfa', accent:true },
   { label:'Sold Out',       key:'Sold Out',  fn:p=>p.filter(x=>x.status==='Sold Out').length,      icon:Package,    color:'#f87171' },
 ];
-const STATUS_MAP = { Available:['rgba(16,185,129,0.12)','rgba(16,185,129,0.3)','#6ee7b7'], 'Sold Out':['rgba(239,68,68,0.12)','rgba(239,68,68,0.3)','#fca5a5'], Pending:['rgba(245,158,11,0.12)','rgba(245,158,11,0.3)','#fcd34d'] };
+const STATUS_MAP = { 'Active': ['rgba(16,185,129,0.12)','rgba(16,185,129,0.3)','#6ee7b7'], 'Sold Out':['rgba(239,68,68,0.12)','rgba(239,68,68,0.3)','#fca5a5'], 'Pending':['rgba(245,158,11,0.12)','rgba(245,158,11,0.3)','#fcd34d'] };
 
 const MyProducts = () => {
   const { user } = useAuth();
@@ -24,9 +24,20 @@ const MyProducts = () => {
   const fetchMyProducts = async () => {
     try {
       setLoading(true);
-      const r = await productsAPI.getAll(filter==='all' ? null : filter);
-      setProducts(r.data.filter(p=>p.seller_id===user?.id));
-    } catch { console.error('Failed to fetch products'); }
+      const params = {};
+      if (filter === 'all') {
+        params.status = 'Active';
+      } else if (filter === 'Available') {
+        params.status = 'Active';
+      } else if (filter === 'Sold Out') {
+        params.status = 'Sold Out';
+      } else if (filter === 'Pending') {
+        params.status = 'Pending';
+      }
+      const r = await productsAPI.getAll(params);
+      const productsData = r.data?.items || [];
+      setProducts(productsData);
+    } catch (e) { console.error('Failed to fetch products', e); }
     finally { setLoading(false); }
   };
 
