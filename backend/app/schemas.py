@@ -47,6 +47,10 @@ class UserLogin(BaseModel):
     phone: str
     password: Optional[str] = None  # For mock auth
 
+class AdminLogin(BaseModel):
+    email: str
+    password: str
+
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None

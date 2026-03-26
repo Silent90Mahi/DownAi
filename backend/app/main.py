@@ -40,7 +40,7 @@ def is_allowed_origin(origin: str) -> bool:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.ENVIRONMENT == "development" else [settings.FRONTEND_URL, "http://localhost:3000"],
+    allow_origins=["*"] if settings.ENVIRONMENT == "development" else [settings.FRONTEND_URL, "http://localhost:6001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

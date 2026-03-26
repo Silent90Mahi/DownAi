@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // API base URL - use relative path in production (Docker) to go through nginx proxy
 // In development, use the direct backend URL
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:6002';
 
 // Create axios instance
 const api = axios.create({
@@ -51,7 +51,7 @@ api.interceptors.response.use(
 export const authAPI = {
   register: (data) => api.post('/api/auth/register', data),
   registerAndSendOTP: (data) => api.post('/api/auth/register-and-send-otp', data),
-  login: (phone, password) => api.post('/api/auth/login', { phone, password, name: 'User' }),
+  login: (email, password) => api.post('/api/auth/admin-login', { email, password }),
   sendOTP: (phone) => api.post('/api/auth/send-otp', { phone }),
   verifyOTP: (phone, otp) => api.post('/api/auth/verify-otp', { phone, otp }),
   getProfile: () => api.get('/api/auth/profile'),

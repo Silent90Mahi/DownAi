@@ -12,7 +12,7 @@ export const useRealTime = () => {
   return context;
 };
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
+const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:6002/ws';
 
 export const RealTimeProvider = ({ children }) => {
   const { user, isAuthenticated } = useAuth();

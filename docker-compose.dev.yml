@@ -18,7 +18,7 @@ services:
     volumes:
       - ./backend:/app
       - ./backend/app:/app/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
+    command: uvicorn app.main:app --host 0.0.0.0 --port 6002 --reload --log-level debug
 
   # ============================================================================
   # Frontend - Development Mode

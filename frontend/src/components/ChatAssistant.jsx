@@ -13,14 +13,21 @@ const AGENTS = [
 ];
 
 const AGENT_SUGGESTIONS = {
-  'VAANI': ['How do I sell my products?', 'What can you help me with?', 'How to improve my trust score?'],
-  'BAZAAR': ['What is the market price for textiles?', 'Show me demand trends', 'What products are trending?'],
-  'JODI': ['Track my recent order', 'How to cancel an order?', 'Update delivery address'],
-  'SAMAGRI': ['Find raw material suppliers', 'Compare supplier prices', 'Join bulk purchase request'],
-  'SAMPARK': ['Show my federation hierarchy', 'How to post in community?', 'Find peer SHGs'],
-  'VISHWAS': ['What is my trust coin balance?', 'How to redeem trust coins?', 'Connect my wallet'],
-  'SUPPORT': ['How does the app work?', 'Report a bug', 'Contact support'],
+  'VAANI': ['How do I sell products?', 'What can you help with?', 'Show my dashboard summary'],
+  'BAZAAR': ['Current market prices', 'Demand trends this month', 'Best products to sell now'],
+  'JODI': ['Track my orders', 'Update delivery address', 'Cancel an order'],
+  'SAMAGRI': ['Find suppliers nearby', 'Request a quote', 'Join bulk purchase'],
+  'SAMPARK': ['My federation hierarchy', 'Latest community posts', 'Connect with SHGs'],
+  'VISHWAS': ['My trust coin balance', 'How to earn coins?', 'Redeem my coins'],
+  'SUPPORT': ['How does the app work?', 'I found a bug', 'Contact support'],
 };
+
+const QUICK_ACTIONS = [
+  { id: 'track_order', label: '📦 Track Order', message: 'Track my recent orders' },
+  { id: 'check_balance', label: '💰 Check Balance', message: 'What is my trust coin balance?' },
+  { id: 'find_suppliers', label: '🏭 Find Suppliers', message: 'Find raw material suppliers near me' },
+  { id: 'market_price', label: '📊 Market Price', message: 'What is the current market price for handicrafts?' },
+];
 
 const PROJECT_KNOWLEDGE = `
 You are part of the Ooumph SHG Marketplace ecosystem. Here's what you know about the app:
@@ -67,6 +74,7 @@ const ChatAssistant = () => {
   const [recording, setRecording] = useState(false);
   const [currentResponse, setCurrentResponse] = useState('');
   const [streaming, setStreaming] = useState(false);
+  const [error, setError] = useState(null);
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -99,15 +107,41 @@ const ChatAssistant = () => {
 
   const getAgentWelcome = (agent) => {
     const welcomes = {
-      'VAANI': `🙏 Namaste! I am ${agent.name}. How can I help you today?`,
-      'BAZAAR': `📊 Hello! I'm ${agent.name}. I can help you with market trends, pricing, and demand analysis. What would you like to know?`,
-      'JODI': `📦 Hi there! I'm ${agent.name}. I can help you track orders, manage deliveries, and handle order issues. What do you need?`,
-      'SAMAGRI': `🏭 Welcome! I'm ${agent.name}. I can help you find suppliers, compare prices, and coordinate bulk purchases. How can I assist?`,
-      'SAMPARK': `👥 Hello! I'm ${agent.name}. I can help you with community posts, federation info, and connecting with other SHGs. What would you like to know?`,
-      'VISHWAS': `💰 Hi! I'm ${agent.name}. I can help you with trust coins, wallet connections, and payments. What do you need?`,
-      'SUPPORT': `🆘 Hello! I'm ${agent.name}. I can help you with app navigation, troubleshooting, and general questions. How can I help?`,
+      'VAANI': `🙏 Namaste! I am ${agent.name}, your SHG Marketplace Assistant.\n\n**I can help you with:**\n• 🛒 Selling products on the marketplace\n• 📋 Understanding your dashboard\n• ⭐ Improving your trust score\n• 🎯 Finding the right features\n\n**Try asking:** "Show my dashboard summary"`,
+      'BAZAAR': `📊 Welcome! I'm ${agent.name}, your Market Intelligence expert.\n\n**I can help you with:**\n• 💹 Current market prices & trends\n• 📈 Demand analysis for products\n• 🎯 Best products to sell right now\n• 🌍 Regional market insights\n\n**Try asking:** "What are the best products to sell now?"`,
+      'JODI': `📦 Hi there! I'm ${agent.name}, your Order Management assistant.\n\n**I can help you with:**\n• 🚚 Track your orders in real-time\n• 📍 Update delivery addresses\n• ❌ Cancel orders when needed\n• 📋 View order history\n\n**Try asking:** "Track my orders"`,
+      'SAMAGRI': `🏭 Welcome! I'm ${agent.name}, your Supplier Network advisor.\n\n**I can help you with:**\n• 🔍 Find quality suppliers nearby\n• 💰 Compare supplier prices\n• 🤝 Join bulk purchase requests\n• ⭐ Rate and review suppliers\n\n**Try asking:** "Find suppliers nearby"`,
+      'SAMPARK': `👥 Hello! I'm ${agent.name}, your Community Hub guide.\n\n**I can help you with:**\n• 🏛️ View your federation hierarchy\n• 📰 Latest community posts & updates\n• 🤝 Connect with other SHGs\n• 💬 Share your experiences\n\n**Try asking:** "Show my federation hierarchy"`,
+      'VISHWAS': `💰 Hi! I'm ${agent.name}, your Trust Wallet assistant.\n\n**I can help you with:**\n• 💵 Check your trust coin balance\n• 🎁 Learn how to earn more coins\n• 🔄 Redeem coins for rewards\n• 🔗 Connect your crypto wallet\n\n**Try asking:** "What is my trust coin balance?"`,
+      'SUPPORT': `🆘 Hello! I'm ${agent.name}, your Support Bot.\n\n**I can help you with:**\n• 📱 App navigation & features\n• 🐛 Report bugs or issues\n• ❓ Answer general questions\n• 📞 Contact human support\n\n**Try asking:** "How does the app work?"`,
     };
     return welcomes[agent.id] || welcomes['VAANI'];
+  };
+
+  const handleQuickAction = (actionMessage) => {
+    setMessage(actionMessage);
+    setTimeout(() => {
+      const form = document.querySelector('form');
+      if (form) {
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      }
+    }, 50);
+  };
+
+  const getErrorMessage = (err) => {
+    if (!navigator.onLine) {
+      return '🌐 You appear to be offline. Please check your internet connection and try again.';
+    }
+    if (err?.response?.status === 401) {
+      return '🔐 Your session has expired. Please log in again to continue.';
+    }
+    if (err?.response?.status === 429) {
+      return '⏳ Too many requests. Please wait a moment and try again.';
+    }
+    if (err?.response?.status >= 500) {
+      return '🔧 Our servers are experiencing issues. Please try again in a few minutes.';
+    }
+    return '❌ Something went wrong. Please try again or contact support if the problem persists.';
   };
 
   const handleSend = async (e) => {
@@ -115,12 +149,13 @@ const ChatAssistant = () => {
     if (!message.trim() || loading) return;
     const userMsg = message;
     setMessage('');
+    setError(null);
     const newLog = [...chatLog, { role: 'user', content: userMsg }];
     setChatLog(newLog);
     setLoading(true); setStreaming(true); setCurrentResponse('');
 
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:6002';
       const token = localStorage.getItem('token');
       const eventSource = new EventSource(
         `${API_BASE_URL}/api/chat/stream?query=${encodeURIComponent(userMsg)}&language=${language}&agent=${selectedAgent.id}`,
@@ -130,7 +165,8 @@ const ChatAssistant = () => {
       eventSource.onmessage = (event) => {
         const data = JSON.parse(event.data);
         if (data.error) {
-          setChatLog(prev => [...prev, { role: 'assistant', content: 'Error: ' + data.error, agent: selectedAgent.id }]);
+          setError(data.error);
+          setChatLog(prev => [...prev, { role: 'assistant', content: getErrorMessage({ response: { status: 400 } }) + '\n\n*Error: ' + data.error + '*', agent: selectedAgent.id, isError: true }]);
           setStreaming(false); setLoading(false); eventSource.close(); return;
         }
         if (data.content) { fullResponse += data.content; setCurrentResponse(fullResponse); }
@@ -141,23 +177,29 @@ const ChatAssistant = () => {
           setCurrentResponse(''); setStreaming(false); setLoading(false); eventSource.close();
         }
       };
-      eventSource.onerror = async () => {
+      eventSource.onerror = async (err) => {
         eventSource.close();
         try {
           const res = await chatAPI.sendMessage(userMsg, language);
           const finalLog = [...newLog, { role: 'assistant', content: res.data.reply || res.data.response, agent: res.data.agent_triggered || selectedAgent.id }];
           setChatLog(finalLog);
           saveToHistory(finalLog);
-        } catch { setChatLog(prev => [...prev, { role: 'assistant', content: 'Connection failed. Please try again later.', agent: selectedAgent.id }]); }
+        } catch (catchErr) {
+          setError(catchErr);
+          setChatLog(prev => [...prev, { role: 'assistant', content: getErrorMessage(catchErr), agent: selectedAgent.id, isError: true }]);
+        }
         finally { setCurrentResponse(''); setStreaming(false); setLoading(false); }
       };
-    } catch {
+    } catch (err) {
       try {
         const res = await chatAPI.sendMessage(userMsg, language);
         const finalLog = [...newLog, { role: 'assistant', content: res.data.reply || res.data.response, agent: res.data.agent_triggered || selectedAgent.id }];
         setChatLog(finalLog);
         saveToHistory(finalLog);
-      } catch { setChatLog(prev => [...prev, { role: 'assistant', content: 'Connection failed. Please try again later.', agent: selectedAgent.id }]); }
+      } catch (catchErr) {
+        setError(catchErr);
+        setChatLog(prev => [...prev, { role: 'assistant', content: getErrorMessage(catchErr), agent: selectedAgent.id, isError: true }]);
+      }
       finally { setCurrentResponse(''); setStreaming(false); setLoading(false); }
     }
   };
@@ -342,10 +384,10 @@ const ChatAssistant = () => {
                 <div style={{
                   maxWidth: '85%', padding: '0.6rem 0.8rem',
                   borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                  background: msg.role === 'user' ? `linear-gradient(135deg, ${selectedAgent.color}, ${selectedAgent.color}cc)` : 'rgba(255,255,255,0.06)',
-                  border: msg.role === 'user' ? 'none' : `1px solid ${selectedAgent.color}18`,
+                  background: msg.isError ? 'rgba(239, 68, 68, 0.1)' : msg.role === 'user' ? `linear-gradient(135deg, ${selectedAgent.color}, ${selectedAgent.color}cc)` : 'rgba(255,255,255,0.06)',
+                  border: msg.isError ? '1px solid rgba(239, 68, 68, 0.3)' : msg.role === 'user' ? 'none' : `1px solid ${selectedAgent.color}18`,
                   fontSize: '0.8rem', lineHeight: 1.5,
-                  color: msg.role === 'user' ? '#fff' : 'var(--text-secondary)',
+                  color: msg.isError ? '#fca5a5' : msg.role === 'user' ? '#fff' : 'var(--text-secondary)',
                 }}>
                   {msg.agent && (
                     <div style={{ fontSize: '0.65rem', fontWeight: 700, color: selectedAgent.color, marginBottom: 3 }}>
@@ -354,9 +396,14 @@ const ChatAssistant = () => {
                   )}
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
                     <div style={{ flex: 1, whiteSpace: 'pre-line' }}>{msg.content}</div>
-                    {msg.role === 'assistant' && (
+                    {msg.role === 'assistant' && !msg.isError && (
                       <button onClick={() => handleVoicePlayback(msg.content)} style={{ flexShrink: 0, padding: 2, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
                         <Volume2 size={12} />
+                      </button>
+                    )}
+                    {msg.isError && (
+                      <button onClick={() => { setError(null); }} style={{ flexShrink: 0, padding: 2, border: 'none', background: 'none', cursor: 'pointer', color: '#fca5a5' }}>
+                        <X size={12} />
                       </button>
                     )}
                   </div>
@@ -382,12 +429,16 @@ const ChatAssistant = () => {
             {loading && !currentResponse && (
               <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
                 <div style={{
-                  padding: '0.5rem 0.8rem', background: 'rgba(255,255,255,0.05)',
+                  padding: '0.6rem 1rem', background: 'rgba(255,255,255,0.05)',
                   border: `1px solid ${selectedAgent.color}15`, borderRadius: '16px 16px 16px 4px',
-                  display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: '0.75rem',
+                  display: 'flex', alignItems: 'center', gap: 10,
                 }}>
-                  <Loader2 size={12} style={{ animation: 'spin 0.7s linear infinite', color: selectedAgent.color }} />
-                  {selectedAgent.name} is thinking...
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: selectedAgent.color, animation: 'typingDot 1s ease-in-out infinite' }} />
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: selectedAgent.color, animation: 'typingDot 1s ease-in-out 0.2s infinite' }} />
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: selectedAgent.color, animation: 'typingDot 1s ease-in-out 0.4s infinite' }} />
+                  </div>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{selectedAgent.name} is typing...</span>
                 </div>
               </div>
             )}
@@ -425,8 +476,31 @@ const ChatAssistant = () => {
               <Send size={14} style={{ marginLeft: 1 }} />
             </button>
           </form>
+
+          {/* Quick Action Buttons */}
+          <div style={{
+            padding: '0.5rem 0.8rem 0.7rem', borderTop: `1px solid ${selectedAgent.color}10`,
+            background: 'rgba(0,0,0,0.2)', display: 'flex', flexWrap: 'wrap', gap: 6,
+          }}>
+            {QUICK_ACTIONS.map((action) => (
+              <button key={action.id} onClick={() => handleQuickAction(action.message)} disabled={loading} style={{
+                display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px',
+                background: `${selectedAgent.color}10`, border: `1px solid ${selectedAgent.color}25`,
+                borderRadius: 12, cursor: loading ? 'not-allowed' : 'pointer', fontSize: '0.7rem',
+                color: 'var(--text-secondary)', transition: 'all 0.2s', opacity: loading ? 0.5 : 1,
+              }}>
+                {action.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
+      <style>{`
+        @keyframes typingDot {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+          30% { transform: translateY(-4px); opacity: 1; }
+        }
+      `}</style>
     </>
   );
 };

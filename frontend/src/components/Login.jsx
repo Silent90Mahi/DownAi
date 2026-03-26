@@ -1,41 +1,71 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
-import { Zap, Loader2, User, Phone, ShieldCheck } from 'lucide-react';
+import { Zap, Loader2, Mail, Lock, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [isRegister, setIsRegister] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [phone, setPhone] = useState('');
-  const [name, setName] = useState('');
-  const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
+  const [success, setSuccess] = useState('');
+  const [email, setEmail] = useState('admin@ooumphshg.com');
+  const [password, setPassword] = useState('password@123');
+  const [showPassword, setShowPassword] = useState(false);
+  const [firstClick, setFirstClick] = useState(true);
+
+  const clearMessages = useCallback(() => {
+    setError('');
+    setSuccess('');
+  }, []);
+
+  const showError = useCallback((msg) => {
+    setError(msg);
+    setSuccess('');
+  }, []);
+
+  const showSuccess = useCallback((msg) => {
+    setSuccess(msg);
+    setError('');
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) navigate('/');
   }, [isAuthenticated, navigate]);
 
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    clearMessages();
+    
+    if (email !== 'admin@ooumphshg.com' || password !== 'password@123') {
+      showError('Invalid credentials. Only admin access allowed.');
+      return;
+    }
+    
     setLoading(true);
     try {
-      if (isRegister && !otpSent) {
-        await authAPI.registerAndSendOTP({ phone, name, role: 'SHG', district: 'Hyderabad' });
-        setOtpSent(true);
-      } else if (isRegister && otpSent) {
-        await authAPI.verifyOTP(phone, otp);
-        await login(phone, '123456');
-      } else {
-        await login(phone, '123456');
-      }
-      navigate('/');
+      await login(email, password);
+      showSuccess('Login successful! Redirecting...');
+      setTimeout(() => {
+        navigate('/');
+      }, 1000);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Something went wrong');
+      showError('Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -52,7 +82,6 @@ const Login = () => {
       overflow: 'hidden',
       background: 'var(--bg-primary)',
     }}>
-      {/* Background glow blobs */}
       <div style={{
         position: 'absolute', top: '-15%', left: '20%',
         width: 500, height: 500, borderRadius: '50%',
@@ -66,7 +95,6 @@ const Login = () => {
         pointerEvents: 'none',
       }} />
 
-      {/* Card */}
       <div className="animate-scale-in" style={{
         width: '100%',
         maxWidth: 440,
@@ -80,7 +108,6 @@ const Login = () => {
         position: 'relative',
         zIndex: 1,
       }}>
-        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{
             width: 72, height: 72,
@@ -101,116 +128,63 @@ const Login = () => {
             backgroundClip: 'text',
             marginBottom: '0.5rem',
           }}>
-            {isRegister ? 'Join Ooumph' : 'Welcome Back'}
+            Admin Login
           </h2>
           <p style={{ color: 'var(--text-tertiary)', fontSize: '0.9rem', margin: 0 }}>
-            {isRegister ? 'Create your SHG account' : 'The Last Human Network for SHGs'}
+            Ooumph SHG Marketplace Administration
           </p>
         </div>
 
-        {/* Toggle */}
-        <div style={{
-          display: 'flex',
-          background: 'rgba(0,0,0,0.3)',
-          border: '1px solid rgba(139,92,246,0.2)',
-          borderRadius: 99,
-          padding: 4,
-          marginBottom: '1.75rem',
-        }}>
-          {['Login', 'Register'].map((tab) => {
-            const active = (tab === 'Register') === isRegister;
-            return (
-              <button
-                key={tab}
-                onClick={() => { setIsRegister(tab === 'Register'); setOtpSent(false); setError(''); }}
-                style={{
-                  flex: 1, padding: '0.5rem',
-                  borderRadius: 99,
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  transition: 'all 0.25s',
-                  background: active
-                    ? 'linear-gradient(135deg, #7c3aed, #a855f7)'
-                    : 'transparent',
-                  color: active ? '#fff' : 'var(--text-muted)',
-                  boxShadow: active ? '0 0 14px rgba(139,92,246,0.4)' : 'none',
-                }}
-              >
-                {tab}
-              </button>
-            );
-          })}
-        </div>
+        {error && (
+          <div style={{
+            background: 'rgba(239,68,68,0.12)',
+            border: '1px solid rgba(239,68,68,0.3)',
+            color: '#fca5a5',
+            padding: '0.75rem 1rem',
+            borderRadius: 10,
+            fontSize: '0.85rem',
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}>
+            <AlertCircle size={18} />
+            <span>{error}</span>
+          </div>
+        )}
 
-        {/* Form */}
+        {success && (
+          <div style={{
+            background: 'rgba(16,185,129,0.12)',
+            border: '1px solid rgba(16,185,129,0.3)',
+            color: '#6ee7b7',
+            padding: '0.75rem 1rem',
+            borderRadius: 10,
+            fontSize: '0.85rem',
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}>
+            <CheckCircle2 size={18} />
+            <span>{success}</span>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-          {error && (
-            <div style={{
-              background: 'rgba(239,68,68,0.12)',
-              border: '1px solid rgba(239,68,68,0.3)',
-              color: '#fca5a5',
-              padding: '0.75rem 1rem',
-              borderRadius: 10,
-              fontSize: '0.85rem',
-              fontWeight: 500,
-            }}>
-              {error}
-            </div>
-          )}
-
-          {isRegister && !otpSent && (
-            <div>
-              <label style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                fontSize: '0.8rem', fontWeight: 600,
-                color: 'var(--text-secondary)', marginBottom: '0.5rem',
-              }}>
-                <User size={14} style={{ color: 'var(--accent-primary)' }} />
-                Your Name
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                style={{
-                  width: '100%', padding: '0.75rem 1rem',
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(139,92,246,0.2)',
-                  borderRadius: 10,
-                  color: 'var(--text-primary)',
-                  fontSize: '0.95rem',
-                  outline: 'none',
-                  transition: 'all 0.2s',
-                }}
-                placeholder="e.g. Lakshmi Devi"
-                required
-                onFocus={e => {
-                  e.target.style.borderColor = '#8b5cf6';
-                  e.target.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.15)';
-                }}
-                onBlur={e => {
-                  e.target.style.borderColor = 'rgba(139,92,246,0.2)';
-                  e.target.style.boxShadow = 'none';
-                }}
-              />
-            </div>
-          )}
-
           <div>
             <label style={{
               display: 'flex', alignItems: 'center', gap: 6,
               fontSize: '0.8rem', fontWeight: 600,
               color: 'var(--text-secondary)', marginBottom: '0.5rem',
             }}>
-              <Phone size={14} style={{ color: 'var(--accent-primary)' }} />
-              Mobile Number
+              <Mail size={14} style={{ color: 'var(--accent-primary)' }} />
+              Email
             </label>
             <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               style={{
                 width: '100%', padding: '0.75rem 1rem',
                 background: 'rgba(255,255,255,0.06)',
@@ -220,12 +194,9 @@ const Login = () => {
                 fontSize: '0.95rem',
                 outline: 'none',
                 transition: 'all 0.2s',
-                opacity: otpSent ? 0.6 : 1,
               }}
-              placeholder="9876543210"
-              pattern="[0-9]{10}"
+              placeholder="admin@ooumphshg.com"
               required
-              disabled={otpSent}
               onFocus={e => {
                 e.target.style.borderColor = '#8b5cf6';
                 e.target.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.15)';
@@ -237,34 +208,32 @@ const Login = () => {
             />
           </div>
 
-          {isRegister && otpSent && (
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.8rem', fontWeight: 600,
-                color: 'var(--text-secondary)', marginBottom: '0.5rem',
-              }}>
-                <ShieldCheck size={14} style={{ color: 'var(--accent-primary)', marginRight: 6 }} />
-                OTP (6 digits)
-              </label>
+          <div>
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontSize: '0.8rem', fontWeight: 600,
+              color: 'var(--text-secondary)', marginBottom: '0.5rem',
+            }}>
+              <Lock size={14} style={{ color: 'var(--accent-primary)' }} />
+              Password
+            </label>
+            <div style={{ position: 'relative' }}>
               <input
-                type="text"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 style={{
                   width: '100%', padding: '0.75rem 1rem',
+                  paddingRight: '2.5rem',
                   background: 'rgba(255,255,255,0.06)',
                   border: '1px solid rgba(139,92,246,0.2)',
                   borderRadius: 10,
                   color: 'var(--text-primary)',
-                  fontSize: '1.5rem',
-                  letterSpacing: '0.3em',
-                  textAlign: 'center',
+                  fontSize: '0.95rem',
                   outline: 'none',
                   transition: 'all 0.2s',
                 }}
-                placeholder="••••••"
-                pattern="[0-9]{6}"
+                placeholder="password@123"
                 required
                 onFocus={e => {
                   e.target.style.borderColor = '#8b5cf6';
@@ -275,11 +244,25 @@ const Login = () => {
                   e.target.style.boxShadow = 'none';
                 }}
               />
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: 6 }}>
-                Mock OTP: 123456
-              </p>
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  padding: '0.25rem',
+                }}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
-          )}
+          </div>
 
           <button
             type="submit"
@@ -309,32 +292,19 @@ const Login = () => {
             {loading ? (
               <>
                 <Loader2 size={18} style={{ animation: 'spin 0.7s linear infinite' }} />
-                Processing...
+                Signing in...
               </>
             ) : (
-              isRegister ? (otpSent ? 'Complete Registration' : 'Send OTP') : 'Login via OTP'
+              <>
+                <CheckCircle2 size={18} />
+                Sign In
+              </>
             )}
           </button>
         </form>
 
-        {/* Toggle Link */}
-        <div style={{ marginTop: '1.75rem', textAlign: 'center', borderTop: '1px solid rgba(139,92,246,0.12)', paddingTop: '1.5rem' }}>
-          <button
-            onClick={() => { setIsRegister(!isRegister); setOtpSent(false); setError(''); }}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              fontSize: '0.875rem', fontWeight: 600,
-              color: 'var(--text-link)', transition: 'color 0.2s',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-link-hover)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-link)')}
-          >
-            {isRegister ? 'Already have an account? Login' : "Don't have an account? Register"}
-          </button>
-        </div>
-
         <p style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '1.25rem' }}>
-          🌐 Available in English, Telugu, Hindi, Urdu
+          🔒 Admin access only • Contact support for assistance
         </p>
       </div>
     </div>

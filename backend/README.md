@@ -52,14 +52,14 @@ FastAPI backend for the Ooumph SHG Smart Market Linkage Platform - an AI-powered
 
 5. **Run Development Server**
    ```bash
-   uvicorn app.main:app --reload --port 8000
+   uvicorn app.main:app --reload --port 6002
    ```
 
 ### Docker Setup
 
 ```bash
 docker build -t ooumph-backend --target development .
-docker run -p 8000:8000 --env-file .env ooumph-backend
+docker run -p 6002:6002 --env-file .env ooumph-backend
 ```
 
 ## API Endpoints
@@ -329,7 +329,7 @@ docker build --target production -t ooumph-backend .
 ### Health Check
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:6002/health
 ```
 
 Response:

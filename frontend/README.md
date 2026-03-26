@@ -166,7 +166,7 @@ npm run lint     # Run ESLint
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `VITE_API_URL` | Yes | `http://localhost:8000` | Backend API URL |
+| `VITE_API_URL` | Yes | `http://localhost:6002` | Backend API URL |
 
 ### Styling
 

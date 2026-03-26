@@ -8,7 +8,7 @@ services:
     env_file:
       - .env.docker
     ports:
-      - "8000:8000"
+      - "6002:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -37,7 +37,7 @@ services:
         - VITE_API_URL=
     container_name: ooumph-frontend
     ports:
-      - "3000:80"
+      - "6001:80"
     depends_on:
       backend:
         condition: service_healthy
@@ -53,7 +53,7 @@ services:
       POSTGRES_USER: ooumph
       POSTGRES_PASSWORD: password
     ports:
-      - "5432:5432"
+      - "6003:5432"
     networks:
       - ooumph-network
     volumes:
@@ -70,7 +70,7 @@ services:
     image: redis:7-alpine
     container_name: ooumph-redis
     ports:
-      - "6379:6379"
+      - "6004:6379"
     networks:
       - ooumph-network
     volumes:

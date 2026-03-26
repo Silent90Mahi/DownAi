@@ -2,10 +2,11 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from passlib.hash import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from ..database import SessionLocal
+from ..database import SessionLocal, get_db
 from .. import models, schemas
 from ..services import trust_service, notification_service
 from core.config import settings
@@ -13,7 +14,6 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
-# Use settings from environment instead of hardcoded values
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
 
@@ -27,7 +27,6 @@ def get_db():
         db.close()
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Create JWT access token using configured settings"""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -37,8 +36,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    """Validate and get current user from JWT token"""
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -48,19 +46,13 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         phone: str = payload.get("sub")
         if phone is None:
-            logger.warning("Token missing subject (phone)")
             raise credentials_exception
-    except JWTError as e:
-        logger.warning(f"JWT decode error: {e}")
+        user = db.query(models.User).filter(models.User.phone == phone).first()
+        if user is None:
+            raise credentials_exception
+        return user
+    except JWTError:
         raise credentials_exception
-
-    user = db.query(models.User).filter(models.User.phone == phone).first()
-    if user is None:
-        logger.warning(f"User not found for phone: {phone}")
-        raise credentials_exception
-
-    logger.debug(f"User authenticated: {user.id}")
-    return user
 
 async def get_current_user_optional(token: Optional[str] = None, db: Session = Depends(get_db)):
     """Validate and get current user from JWT token (optional - returns None if invalid)"""
@@ -310,3 +302,46 @@ async def get_current_user_info(current_user: models.User = Depends(get_current_
 async def logout(current_user: models.User = Depends(get_current_user)):
     """Logout (client-side token removal)"""
     return {"message": "Logged out successfully"}
+
+@router.post("/admin-login", response_model=schemas.Token)
+async def admin_login(request: schemas.AdminLogin, db: Session = Depends(get_db)):
+    """Admin login with email and password"""
+    ADMIN_EMAIL = "admin@ooumphshg.com"
+    ADMIN_PASSWORD = "password@123"
+    ADMIN_PHONE = "admin@ooumphshg.com"
+
+    if request.email != ADMIN_EMAIL or request.password != ADMIN_PASSWORD:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials. Only admin access allowed.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user = db.query(models.User).filter(models.User.phone == ADMIN_PHONE).first()
+    if not user:
+        user = models.User(
+            phone=ADMIN_PHONE,
+            name="Admin",
+            email=ADMIN_EMAIL,
+            role=models.UserRole.ADMIN,
+            hierarchy_level=models.HierarchyLevel.NONE,
+            district="Hyderabad",
+            trust_score=100.0,
+            trust_coins=1000,
+            trust_badge="Gold",
+            phone_verified=True
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    user.last_login = datetime.utcnow()
+    db.commit()
+
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.phone, "role": user.role.value},
+        expires_delta=access_token_expires
+    )
+
+    return {"access_token": access_token, "token_type": "bearer", "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60}

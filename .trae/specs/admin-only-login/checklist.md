@@ -1,0 +1,32 @@
+# Admin-Only Login Checklist
+
+- [x] Checkpoint: Registration UI completely removed
+  - No registration tab visible
+  - No "Don't have an account? Register" link
+  - No registration form fields visible
+  - Email field shows admin@ooumphshg.com
+  - Password field shows password@123 (masked by default)
+- [x] Checkpoint: Default credentials pre-filled
+  - Email field shows admin@ooumphshg.com
+  - Password field shows ********
+
+- [x] Checkpoint: Auto-fill functionality works
+  - First click on login populates credentials if empty
+- [x] Checkpoint: Login works with admin credentials
+  - Login succeeds with admin@ooumphshg.com / password@123
+  - User is redirected to dashboard
+- [x] Checkpoint: Registration API disabled
+  - POST /api/auth/register returns 403 Forbidden
+  - POST /api/auth/send-otp for registration returns 403 Forbidden
+- [x] Checkpoint: Default admin user exists in database
+  - Admin user created with email admin@ooumphshg.com
+  - Password hash stored correctly
+- [x] Checkpoint: No registration routes accessible
+  - No /register route in frontend
+  - Registration endpoints return 403
+- [x] Checkpoint: Error handling for invalid credentials
+  - Proper error message shown for wrong credentials
+  - No information leakage about valid credentials
+- [x] Checkpoint: AuthContext supports email/password login
+  - Email field updated correctly
+  - Password field updated correctly

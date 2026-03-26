@@ -39,6 +39,12 @@ class ProductStatus(str, enum.Enum):
     SOLD_OUT = "Sold Out"
     INACTIVE = "Inactive"
 
+user_role_enum = SQLEnum(UserRole, name='user_role_enum', create_type=False, native_enum=False)
+hierarchy_level_enum = SQLEnum(HierarchyLevel, name='hierarchy_level_enum', create_type=False, native_enum=False)
+order_status_enum = SQLEnum(OrderStatus, name='order_status_enum', create_type=False, native_enum=False)
+payment_status_enum = SQLEnum(PaymentStatus, name='payment_status_enum', create_type=False, native_enum=False)
+product_status_enum = SQLEnum(ProductStatus, name='product_status_enum', create_type=False, native_enum=False)
+
 # ============================================================================
 # USER MODEL
 # ============================================================================
@@ -46,12 +52,12 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    phone = Column(String(15), unique=True, index=True, nullable=False)
+    phone = Column(String(100), unique=True, index=True, nullable=False)
     phone_verified = Column(Boolean, default=False)
     name = Column(String(100), nullable=False)
     email = Column(String(100), unique=True, index=True, nullable=True)
-    role = Column(SQLEnum(UserRole), default=UserRole.SHG, nullable=False)
-    hierarchy_level = Column(SQLEnum(HierarchyLevel), default=HierarchyLevel.SHG)
+    role = Column(user_role_enum, default=UserRole.SHG, nullable=False)
+    hierarchy_level = Column(hierarchy_level_enum, default=HierarchyLevel.SHG)
 
     # Location and Profile
     district = Column(String(50))
@@ -212,8 +218,8 @@ class Order(Base):
     final_amount = Column(Float, nullable=False)
 
     # Status
-    order_status = Column(SQLEnum(OrderStatus), default=OrderStatus.PLACED, index=True)
-    payment_status = Column(SQLEnum(PaymentStatus), default=PaymentStatus.PENDING)
+    order_status = Column(order_status_enum, default=OrderStatus.PLACED, index=True)
+    payment_status = Column(payment_status_enum, default=PaymentStatus.PENDING)
 
     # Payment
     payment_method = Column(String(50))
@@ -757,6 +763,10 @@ class SyncAction(str, enum.Enum):
     DELETE = "delete"
 
 
+sync_status_enum = SQLEnum(SyncStatus, name='sync_status_enum', create_type=False, native_enum=False)
+sync_action_enum = SQLEnum(SyncAction, name='sync_action_enum', create_type=False, native_enum=False)
+
+
 class SyncRecord(Base):
     __tablename__ = "sync_records"
 
@@ -764,10 +774,10 @@ class SyncRecord(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     entity_type = Column(String(50), nullable=False, index=True)
     entity_id = Column(Integer, nullable=False, index=True)
-    action = Column(SQLEnum(SyncAction), nullable=False)
+    action = Column(sync_action_enum, nullable=False)
     data = Column(JSON, nullable=False)
     server_data = Column(JSON)
-    sync_status = Column(SQLEnum(SyncStatus), default=SyncStatus.PENDING, index=True)
+    sync_status = Column(sync_status_enum, default=SyncStatus.PENDING, index=True)
     client_timestamp = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     synced_at = Column(DateTime(timezone=True))

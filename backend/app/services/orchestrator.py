@@ -13,9 +13,86 @@ from openai import AsyncOpenAI
 from sqlalchemy.orm import Session
 from . import voice_service, market_service, matching_service, supplier_service
 from .. import models
+from ..models import Order, CoinTransaction, User, Product, Post, Supplier, Material
 from core.config import settings
+from sqlalchemy import desc
 
 client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+
+async def get_user_orders_context(user_id: int, db: Session) -> str:
+    """Fetch recent orders context for the user"""
+    try:
+        orders = db.query(Order).filter(
+            (Order.buyer_id == user_id) | (Order.seller_id == user_id)
+        ).order_by(desc(Order.created_at)).limit(5).all()
+        
+        if not orders:
+            return "No orders found."
+        
+        context_parts = []
+        for order in orders:
+            status = order.order_status.value if order.order_status else "Unknown"
+            context_parts.append(
+                f"Order #{order.order_number}: Status={status}, "
+                f"Amount=₹{order.final_amount}, Created={order.created_at.strftime('%Y-%m-%d') if order.created_at else 'N/A'}"
+            )
+        
+        return "Recent Orders:\n" + "\n".join(context_parts)
+    except Exception:
+        return "Unable to fetch orders."
+
+
+async def get_user_wallet_context(user_id: int, db: Session) -> str:
+    """Fetch wallet and trust coin context for the user"""
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return "User not found."
+        
+        recent_transactions = db.query(CoinTransaction).filter(
+            CoinTransaction.user_id == user_id
+        ).order_by(desc(CoinTransaction.created_at)).limit(5).all()
+        
+        context = f"Wallet Status:\n"
+        context += f"- Trust Coins Balance: {user.trust_coins}\n"
+        context += f"- Trust Score: {user.trust_score}/100\n"
+        context += f"- Trust Badge: {user.trust_badge}\n"
+        
+        if recent_transactions:
+            context += "\nRecent Transactions:\n"
+            for txn in recent_transactions:
+                sign = "+" if txn.amount > 0 else ""
+                context += f"- {sign}{txn.amount} coins: {txn.source} ({txn.transaction_type})\n"
+        
+        return context
+    except Exception:
+        return "Unable to fetch wallet information."
+
+
+async def get_user_profile_context(user_id: int, db: Session) -> str:
+    """Fetch profile context for the user"""
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return "User not found."
+        
+        products_count = db.query(Product).filter(
+            Product.seller_id == user_id,
+            Product.status == models.ProductStatus.ACTIVE
+        ).count()
+        
+        context = f"Profile Summary:\n"
+        context += f"- Name: {user.name}\n"
+        context += f"- Role: {user.role.value}\n"
+        context += f"- District: {user.district or 'Not set'}\n"
+        context += f"- Hierarchy Level: {user.hierarchy_level.value}\n"
+        context += f"- Active Products: {products_count}\n"
+        context += f"- Trust Score: {user.trust_score}/100 ({user.trust_badge})\n"
+        
+        return context
+    except Exception:
+        return "Unable to fetch profile information."
 
 CACHE_TTL = 300
 _stream_cache: Dict[str, Dict[str, Any]] = {}
@@ -237,31 +314,36 @@ async def determine_agent(query: str, db: Session) -> str:
     return agent_mapping.get(agent_decision, "VAANI")
 
 def keyword_based_routing(query: str) -> str:
-    """Fallback keyword-based routing"""
+    """Fallback keyword-based routing with context awareness"""
     query_lower = query.lower()
 
-    # Market Expert keywords
-    if any(kw in query_lower for kw in ["market", "demand", "price", "sell", "trend", "competition", "pricing", "analyze"]):
+    order_context_keywords = ["address", "order", "delivery", "shipment", "shipping"]
+    wallet_context_keywords = ["wallet", "payment", "balance", "coins", "coin"]
+
+    if any(kw in query_lower for kw in ["update", "change", "modify", "edit"]):
+        if any(ctx in query_lower for ctx in order_context_keywords):
+            return "JODI"
+        if any(ctx in query_lower for ctx in wallet_context_keywords):
+            return "VISHWAS"
+        if any(ctx in query_lower for ctx in ["profile", "account", "settings"]):
+            return "SUPPORT"
+
+    if any(kw in query_lower for kw in ["market", "demand", "price", "sell", "trend", "competition", "pricing", "analyze", "rates", "rate"]):
         return "BAZAAR"
 
-    # Order Assistant keywords
-    if any(kw in query_lower for kw in ["order", "delivery", "track", "cancel", "shipment", "shipping", "status"]):
+    if any(kw in query_lower for kw in ["order", "delivery", "track", "cancel", "shipment", "shipping", "status", "address", "package", "dispatch", "arrive", "arriving", "delivered", "return", "refund"]):
         return "JODI"
 
-    # Supplier Advisor keywords
-    if any(kw in query_lower for kw in ["supplier", "raw material", "bulk purchase", "sourcing", "materials", "vendor"]):
+    if any(kw in query_lower for kw in ["supplier", "raw material", "bulk purchase", "sourcing", "materials", "vendor", "quote", "procurement", "wholesale", "stock", "inventory"]):
         return "SAMAGRI"
 
-    # Finance Assistant keywords
-    if any(kw in query_lower for kw in ["trust", "score", "badge", "coin", "wallet", "payment", "balance", "transaction", "redeem"]):
+    if any(kw in query_lower for kw in ["trust", "score", "badge", "coin", "coins", "wallet", "payment", "balance", "transaction", "redeem", "earnings", "payout", "credit", "debit"]):
         return "VISHWAS"
 
-    # Community Guide keywords
-    if any(kw in query_lower for kw in ["federation", "slf", "tlf", "community", "district", "shg", "post", "comment"]):
+    if any(kw in query_lower for kw in ["federation", "slf", "tlf", "community", "district", "shg", "post", "comment", "member", "group", "network", "connect", "meeting"]):
         return "SAMPARK"
 
-    # Support Bot keywords
-    if any(kw in query_lower for kw in ["help", "support", "bug", "issue", "problem", "how to", "navigate", "feature"]):
+    if any(kw in query_lower for kw in ["help", "support", "bug", "issue", "problem", "how to", "navigate", "feature", "trouble", "error", "not working", "can't", "cannot"]):
         return "SUPPORT"
 
     return "VAANI"
@@ -279,12 +361,84 @@ async def get_agent_response(agent: str, query: str, user_data: dict,
         return await vishwas_response(query, user_data, db)
     elif agent == "SAMPARK":
         return await sampark_response(query, user_data, db)
+    elif agent == "SUPPORT":
+        return await support_response(query, user_data, db, language)
     else:  # VAANI / GENERAL
         return await vaani_response(query, user_data, db, language)
 
+
+async def support_response(query: str, user_data: dict, db: Session, language: str) -> Dict:
+    """Get response from Support agent - Navigation & Help"""
+    user_id = user_data.get("id")
+    profile_context = await get_user_profile_context(user_id, db) if user_id else "No profile data available."
+    
+    if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "CHANGE_OPENAI_API_KEY":
+        try:
+            response = await client.chat.completions.create(
+                model=settings.OPENAI_MODEL,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"""You are Agent SUPPORT, the Navigation & Help Specialist for the Ooumph SHG marketplace.
+
+Your capabilities:
+- APP NAVIGATION: Help users find and use different features
+- FEATURE EXPLANATIONS: Explain how marketplace features work
+- TROUBLESHOOTING: Guide users through common issues
+- ONBOARDING HELP: Assist new users with getting started
+- BUG REPORTING: Guide users on how to report issues
+
+User's Profile Context:
+{profile_context}
+
+App Navigation Guide:
+- Dashboard: Home screen with overview
+- Sell Product: Add and manage your product listings
+- My Products: View and edit your listed products
+- Orders: Track and manage orders
+- Market Analyzer: View market trends and pricing
+- Raw Materials: Find suppliers and materials
+- Wallet: Trust coins and transactions
+- Community: Connect with other SHGs
+- Profile: Manage your account settings
+
+Guidelines:
+- Respond in {language}
+- Provide clear step-by-step navigation instructions
+- Be patient and helpful
+- Use simple language suitable for rural SHG women
+- Suggest specific pages and features to try
+- Keep responses under 100 words
+- Always offer to help with follow-up questions"""
+                    },
+                    {"role": "user", "content": query}
+                ],
+                temperature=0.7,
+                max_tokens=200
+            )
+            reply = response.choices[0].message.content.strip()
+            return {"reply": reply, "agent": "SUPPORT"}
+        except Exception:
+            pass
+    
+    reply = "Agent SUPPORT here! I can help you navigate the app.\n\n"
+    reply += "📱 Quick Navigation Guide:\n"
+    reply += "• Dashboard → Your home screen\n"
+    reply += "• Sell Product → Add new products\n"
+    reply += "• Orders → Track your orders\n"
+    reply += "• Market Analyzer → Check prices & trends\n"
+    reply += "• Raw Materials → Find suppliers\n"
+    reply += "• Wallet → View trust coins\n\n"
+    reply += "What would you like help with?"
+
+    return {"reply": reply, "agent": "SUPPORT"}
+
 async def vaani_response(query: str, user_data: dict, db: Session,
                         language: str) -> Dict:
-    """Get response from Vaani agent using OpenAI - Focused on products only"""
+    """Get response from Vaani agent using OpenAI - Action-oriented general assistant"""
+    user_id = user_data.get("id")
+    profile_context = await get_user_profile_context(user_id, db) if user_id else "No profile data available."
+    
     try:
         if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "CHANGE_OPENAI_API_KEY":
             response = await client.chat.completions.create(
@@ -292,33 +446,40 @@ async def vaani_response(query: str, user_data: dict, db: Session,
                 messages=[
                     {
                         "role": "system",
-                        "content": f"""You are Agent Vaani (वाणी), a product-focused AI assistant for SHG women in the Ooumph marketplace ecosystem.
+                        "content": f"""You are Agent VAANI (वाणी), the friendly general assistant for the Ooumph SHG marketplace.
 
-IMPORTANT: You ONLY answer questions about:
+You are ACTION-ORIENTED and HELPFUL. Always guide users toward specific actions they can take.
+
+User's Profile Context:
+{profile_context}
+
+Your primary areas:
 - Products (selling, buying, listing, pricing)
 - Orders and order management
 - Buyers and suppliers
 - Raw materials and procurement
-- Trust scores and badges (related to marketplace transactions)
+- Trust scores and badges
 - Market demand and pricing insights
 - Delivery and shipping
-- Product categories (handicrafts, textiles, food products, etc.)
+- General marketplace navigation
 
 You DO NOT answer questions about:
 - General knowledge, news, weather, sports, entertainment
 - Politics, religion, or personal advice
-- Topics unrelated to the Ooumph marketplace and products
+- Topics unrelated to the Ooumph marketplace
 
-If asked about non-product topics, politely redirect: "I'm here to help with your SHG marketplace needs - products, buyers, orders, and trust scores. Would you like help with any of these?"
+If asked about non-marketplace topics, politely redirect: "I'm here to help with your SHG marketplace needs - products, buyers, orders, and trust scores. What would you like help with?"
 
-Guidelines:
+ACTION-ORIENTED Guidelines:
 - Respond in {language}
 - Be concise (under 80 words)
 - Use simple language for rural women
 - Be encouraging and supportive
 - Use traditional greetings (Namaste, Vanakkam)
-- Focus on practical marketplace advice
-- Guide users to take action (list products, find buyers, etc.)"""
+- ALWAYS suggest a specific action the user can take
+- Guide users to relevant pages: Dashboard, Sell Product, Orders, Wallet, Market Analyzer
+- Mention specific features they can use
+- Provide next steps, not just information"""
                     },
                     {"role": "user", "content": query}
                 ],
@@ -331,57 +492,104 @@ Guidelines:
 
         return {"reply": reply, "agent": "VAANI"}
     except Exception as e:
-        # Log error for debugging
         print(f"Vaani OpenAI error: {e}")
         return {"reply": get_fallback_vaani_response(query, user_data), "agent": "VAANI"}
 
 def get_fallback_vaani_response(query: str, user_data: dict) -> str:
-    """Fallback Vaani responses - Product focused"""
+    """Fallback Vaani responses - Action-oriented"""
     query_lower = query.lower()
 
-    # Greetings
     if any(kw in query_lower for kw in ["hello", "hi", "namaste", "hey", "vanakkam"]):
-        return "Namaste! I'm here to help with your SHG marketplace. Ask me about selling products, finding buyers, market prices, or orders!"
+        return "Namaste! I'm here to help with your SHG marketplace. What would you like to do today? Sell products, check orders, or explore market prices?"
 
-    # Product-related help
     if any(kw in query_lower for kw in ["help", "what can you do", "how can you help"]):
-        return "I can help you with: 🛒 Selling your products, 📦 Finding buyers, 💰 Market pricing, 🏭 Raw materials, ⭐ Trust scores, 📝 Orders. What do you need help with?"
+        return "I can help you take action! 🛒 Sell products → Go to 'Sell Product', 📦 Track orders → Go to 'Orders', 💰 Check prices → Go to 'Market Analyzer', 🏭 Find suppliers → Go to 'Raw Materials'. What would you like to do?"
 
-    # Selling products
     if any(kw in query_lower for kw in ["sell", "selling", "list", "add product"]):
-        return "To sell products, go to 'Sell Product' from your dashboard. Add product details, set competitive prices using market insights, and reach thousands of verified buyers!"
+        return "Ready to sell? 📱 Go to Dashboard → Sell Product → Add photos, description & price → Publish! Your product will reach thousands of verified buyers. Start now!"
 
-    # Finding buyers
     if any(kw in query_lower for kw in ["buyer", "buyers", "find buyer", "customer"]):
-        return "I'll help you find buyers! Use the 'Buyer Matches' feature to see verified buyers interested in your products. Higher trust scores get better matching priority!"
+        return "Find buyers now! 📱 Go to Dashboard → Buyer Matches → Browse interested buyers → Send proposals. Higher trust scores get priority matching!"
 
-    # Market prices
     if any(kw in query_lower for kw in ["price", "pricing", "market price", "cost", "rate"]):
-        return "Check 'Market Analyzer' for real-time pricing insights. It shows demand levels, competition, and recommends optimal prices for your products in your district!"
+        return "Check market prices now! 📱 Go to Market Analyzer → Select your product category → View demand trends & recommended prices. Set competitive prices today!"
 
-    # Orders
-    if any(kw in query_lower for kw in ["order", "orders", "delivery", "shipping"]):
-        return "View your orders in 'My Orders' section. Track delivery status, manage shipments, and see buyer details. On-time delivery improves your trust score!"
+    if any(kw in query_lower for kw in ["order", "orders", "delivery", "shipping", "track"]):
+        return "Track your orders now! 📱 Go to Orders → Select order → View real-time status. You can also update address or request cancellation if needed."
 
-    # Raw materials
     if any(kw in query_lower for kw in ["raw material", "supplier", "sourcing", "materials"]):
-        return "Use 'Raw Materials' marketplace to find verified suppliers. Join bulk requests with other SHGs to save 15-25% on procurement costs!"
+        return "Find suppliers now! 📱 Go to Raw Materials → Search by category → Compare prices & ratings → Request quote or join bulk purchase. Save 15-25%!"
 
-    # Trust score
-    if any(kw in query_lower for kw in ["trust", "score", "badge", "coins"]):
-        return f"Your trust score is {user_data.get('trust_score', 50)}. Complete deliveries on time, maintain quality, and stay active to improve. Higher scores = better buyer access!"
+    if any(kw in query_lower for kw in ["trust", "score", "badge", "coins", "balance", "wallet"]):
+        return f"Your trust score: {user_data.get('trust_score', 50)} | Badge: {user_data.get('trust_badge', 'Bronze')} | Coins: {user_data.get('trust_coins', 0)}. 📱 Go to Wallet to redeem coins for discounts!"
 
-    # Thank you
+    if any(kw in query_lower for kw in ["navigate", "how to", "where", "find page", "go to"]):
+        return "I can guide you! Main pages: Dashboard (home), Sell Product (add listings), Orders (track), Market Analyzer (prices), Raw Materials (suppliers), Wallet (coins). Which do you need?"
+
     if "thank" in query_lower:
-        return "You're welcome! Let me know if you need help with products, buyers, or orders. 🌟"
+        return "You're welcome! Is there anything else you'd like to do? I'm here to help you succeed in your SHG business! 🌟"
 
-    # Non-product query - polite redirect
-    return "I specialize in helping with your SHG marketplace - products, buyers, orders, and trust scores. For marketplace assistance, what would you like to know?"
+    return "I specialize in helping with your SHG marketplace - products, buyers, orders, and trust scores. What action would you like to take today?"
 
 async def bazaar_buddhi_response(query: str, user_data: dict, db: Session) -> Dict:
-    """Get response from Bazaar Buddhi agent"""
+    """Get response from Bazaar Buddhi agent - Market Expert"""
+    user_id = user_data.get("id")
     district = user_data.get("district", "Andhra Pradesh")
+    profile_context = await get_user_profile_context(user_id, db) if user_id else "No profile data available."
+    
+    try:
+        market_data = db.query(models.MarketData).filter(
+            models.MarketData.district == district
+        ).order_by(desc(models.MarketData.date)).limit(3).all()
+        market_info = "\n".join([
+            f"• {m.category}: Demand={m.demand_level or 'N/A'}, Trend={m.demand_trend or 'Stable'}"
+            for m in market_data
+        ]) if market_data else "No market data available for your district."
+    except Exception:
+        market_info = "Market data temporarily unavailable."
+    
+    if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "CHANGE_OPENAI_API_KEY":
+        try:
+            response = await client.chat.completions.create(
+                model=settings.OPENAI_MODEL,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"""You are Agent BAZAAR (बाज़ार), the Market Expert for the Ooumph SHG marketplace.
 
+Your capabilities:
+- MARKET PRICE ANALYSIS: Provide current market prices and trends for products
+- DEMAND TRENDS: Show what products are in high demand in the user's district
+- PRODUCT RECOMMENDATIONS: Suggest products to make/sell based on market conditions
+- COMPETITION ANALYSIS: Help understand market saturation and positioning
+- SEASONAL INSIGHTS: Advise on best times to sell specific products
+
+User's Profile Context:
+{profile_context}
+
+Market Data for {district}:
+{market_info}
+
+Guidelines:
+- Provide specific numbers and percentages when possible
+- Suggest actionable pricing strategies
+- Recommend trending product categories
+- Mention seasonal opportunities (festivals, harvest, etc.)
+- Guide users to Market Analyzer page for detailed analysis
+- Keep responses under 100 words
+- Use simple language suitable for rural SHG women
+- Always suggest next steps (check prices, list products, etc.)"""
+                    },
+                    {"role": "user", "content": query}
+                ],
+                temperature=0.7,
+                max_tokens=200
+            )
+            reply = response.choices[0].message.content.strip()
+            return {"reply": reply, "agent": "BAZAAR"}
+        except Exception:
+            pass
+    
     suggestions = [
         f"Current market trends in {district} show good demand for handmade products",
         "Consider listing on multiple platforms for better visibility",
@@ -389,87 +597,276 @@ async def bazaar_buddhi_response(query: str, user_data: dict, db: Session) -> Di
         "The upcoming festival season is a good time to sell"
     ]
 
-    reply = f"Based on current market analysis, here's what I can tell you:\n\n"
-    reply += f"• {suggestions[0]}\n"
-    reply += f"• {suggestions[1]}\n"
-    reply += f"• {suggestions[2]}\n\n"
-    reply += "Would you like specific market analysis for a product? Use the Market Analyzer page for detailed insights."
+    reply = f"Agent BAZAAR here! Market insights for {district}:\n\n"
+    reply += f"📊 Market Trends:\n{market_info}\n\n"
+    reply += "💡 Key Insights:\n"
+    for s in suggestions[:3]:
+        reply += f"• {s}\n"
+    reply += "\nVisit Market Analyzer page for detailed product-level insights!"
 
     return {"reply": reply, "agent": "BAZAAR", "suggestions": suggestions}
 
 async def jodi_response(query: str, user_data: dict, db: Session) -> Dict:
-    """Get response from Jodi agent"""
-    trust_score = user_data.get("trust_score", 50)
+    """Get response from Jodi agent - Order Management Specialist"""
+    user_id = user_data.get("id")
+    orders_context = await get_user_orders_context(user_id, db) if user_id else "No order data available."
+    
+    if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "CHANGE_OPENAI_API_KEY":
+        try:
+            response = await client.chat.completions.create(
+                model=settings.OPENAI_MODEL,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"""You are Agent JODI (जोड़ी), the Order Management Specialist for the Ooumph SHG marketplace.
 
-    reply = f"Agent Jodi here! I can help you find buyers for your products.\n\n"
-    reply += f"Your current trust score is {trust_score}, which gives you {'priority ' if trust_score >= 70 else ''}access to verified buyers.\n\n"
-    reply += "I've found several potential opportunities:\n"
-    reply += "• 3 GeM government tenders matching handicrafts\n"
-    reply += "• 5 wholesale buyers interested in SHG products\n"
-    reply += "• 2 ONDC marketplace opportunities\n\n"
-    reply += "Check the 'Sell Product' page or browse buyer requirements to connect with them!"
+Your capabilities:
+- ORDER STATUS QUERIES: Handle "where is my order", "track order", "order status" requests
+- DELIVERY ADDRESS UPDATES: Help with "update delivery address", "change address" requests  
+- ORDER CANCELLATION: Process "cancel order" requests with proper guidance
+- ORDER HISTORY: Show past orders and their details
+
+Current User's Orders Context:
+{orders_context}
+
+Guidelines:
+- If user asks about orders without providing order ID, ask for the order number
+- Always guide users to the Orders page for detailed tracking
+- For address changes, explain the process and any time limitations
+- For cancellations, mention any applicable policies
+- Be helpful and action-oriented - suggest next steps
+- Keep responses under 100 words
+- Use simple language suitable for rural SHG women
+- Include relevant order details from the context when available"""
+                    },
+                    {"role": "user", "content": query}
+                ],
+                temperature=0.7,
+                max_tokens=200
+            )
+            reply = response.choices[0].message.content.strip()
+            return {"reply": reply, "agent": "JODI"}
+        except Exception:
+            pass
+    
+    reply = "Agent JODI here! I help with order management.\n\n"
+    reply += f"📋 Your Recent Orders:\n{orders_context}\n\n"
+    reply += "I can help you:\n"
+    reply += "• Track order status\n"
+    reply += "• Update delivery address\n"
+    reply += "• Cancel orders\n\n"
+    reply += "Please provide your order number or go to Orders page for details."
 
     return {"reply": reply, "agent": "JODI"}
 
 async def samagri_response(query: str, user_data: dict, db: Session) -> Dict:
-    """Get response from Samagri agent"""
+    """Get response from Samagri agent - Supplier & Materials Advisor"""
+    user_id = user_data.get("id")
     district = user_data.get("district", "Andhra Pradesh")
+    profile_context = await get_user_profile_context(user_id, db) if user_id else "No profile data available."
+    
+    try:
+        suppliers = db.query(Supplier).filter(
+            Supplier.district == district,
+            Supplier.is_verified == True
+        ).limit(3).all()
+        suppliers_info = "\n".join([
+            f"• {s.business_name} - {s.business_type or 'General'} (Rating: {s.rating}★)"
+            for s in suppliers
+        ]) if suppliers else "No verified suppliers in your district yet."
+    except Exception:
+        suppliers_info = "Unable to fetch supplier data."
+    
+    if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "CHANGE_OPENAI_API_KEY":
+        try:
+            response = await client.chat.completions.create(
+                model=settings.OPENAI_MODEL,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"""You are Agent SAMAGRI (सामग्री), the Supplier & Materials Advisor for the Ooumph SHG marketplace.
 
-    reply = f"Agent Samagri reporting! I can help you source raw materials in {district}.\n\n"
-    reply += "Available suppliers:\n"
-    reply += "• Guntur Agro Traders - Agricultural supplies (Verified, 4.5★)\n"
-    reply += "• Cooperative Mills Ltd - Textile materials (4.3★)\n"
-    reply += "• Kurnool Farmers Co-op - Organic inputs (Verified, 4.6★)\n\n"
-    reply += "💡 Tip: Join a bulk request to save 15-25% on raw materials!\n\n"
-    reply += "Visit the Raw Materials marketplace to compare prices and place orders."
+Your capabilities:
+- SUPPLIER SEARCH: Help find verified suppliers for raw materials
+- QUOTE REQUESTS: Guide users on requesting price quotes from suppliers
+- BULK PURCHASE COORDINATION: Help organize group buying to save costs
+- PRICE COMPARISON: Compare materials across different suppliers
+- MATERIAL RECOMMENDATIONS: Suggest quality materials for specific products
+
+User's Profile Context:
+{profile_context}
+
+Available Suppliers in {district}:
+{suppliers_info}
+
+Guidelines:
+- Recommend verified suppliers with good ratings
+- Suggest bulk purchases for cost savings (15-25% typically)
+- Guide users to Raw Materials marketplace for full catalog
+- Explain how to request quotes from suppliers
+- Mention delivery options and timeframes
+- Keep responses under 100 words
+- Use simple language suitable for rural SHG women
+- Always suggest actionable next steps"""
+                    },
+                    {"role": "user", "content": query}
+                ],
+                temperature=0.7,
+                max_tokens=200
+            )
+            reply = response.choices[0].message.content.strip()
+            return {"reply": reply, "agent": "SAMAGRI"}
+        except Exception:
+            pass
+    
+    reply = f"Agent SAMAGRI here! Your Supplier & Materials guide for {district}.\n\n"
+    reply += f"📦 Verified Suppliers:\n{suppliers_info}\n\n"
+    reply += "💡 Tip: Join bulk requests to save 15-25% on materials!\n\n"
+    reply += "I can help you:\n"
+    reply += "• Find suppliers for specific materials\n"
+    reply += "• Request price quotes\n"
+    reply += "• Coordinate bulk purchases\n\n"
+    reply += "Visit Raw Materials marketplace to browse all options!"
 
     return {"reply": reply, "agent": "SAMAGRI"}
 
 async def vishwas_response(query: str, user_data: dict, db: Session) -> Dict:
-    """Get response from Vishwas agent"""
-    trust_score = user_data.get("trust_score", 50)
-    trust_coins = user_data.get("trust_coins", 0)
-    badge = user_data.get("trust_badge", "Bronze")
+    """Get response from Vishwas agent - Finance & Wallet Specialist"""
+    user_id = user_data.get("id")
+    wallet_context = await get_user_wallet_context(user_id, db) if user_id else "No wallet data available."
+    
+    if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "CHANGE_OPENAI_API_KEY":
+        try:
+            response = await client.chat.completions.create(
+                model=settings.OPENAI_MODEL,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"""You are Agent VISHWAS (विश्वास), the Finance & Wallet Specialist for the Ooumph SHG marketplace.
 
-    reply = f"Agent Vishwas here! Your Trust & Compliance status:\n\n"
-    reply += f"📊 Trust Score: {trust_score}/100\n"
-    reply += f"🏅 Badge: {badge}\n"
-    reply += f"💰 Trust Coins: {trust_coins}\n\n"
+Your capabilities:
+- BALANCE QUERIES: Handle "what is my balance", "trust coins", "how many coins" requests
+- TRANSACTION HISTORY: Show recent transactions and their details
+- WALLET CONNECTION HELP: Guide users on connecting and using their wallet
+- REDEMPTION GUIDANCE: Explain how to redeem trust coins for benefits
+- TRUST SCORE EXPLANATIONS: Explain trust badges and how to improve them
 
-    if trust_score >= 90:
-        reply += "Excellent! You're a Gold badge member with top trust score!"
-    elif trust_score >= 70:
-        reply += "Great progress! Maintain your performance to reach Gold badge."
-    else:
-        reply += "Complete more orders on time to improve your trust score!"
+Current User's Wallet Context:
+{wallet_context}
 
-    reply += "\n\nYour trust score affects:\n"
-    reply += "• Buyer matching priority\n"
-    reply += "• Access to premium opportunities\n"
-    reply += "• Bulk purchase benefits"
+Guidelines:
+- Always provide current balance when asked
+- Explain trust coin earning opportunities (completing orders, referrals, etc.)
+- Guide users to Wallet page for full transaction history
+- Explain redemption options clearly (discounts, premium features, etc.)
+- Be encouraging about improving trust scores
+- Keep responses under 100 words
+- Use simple language suitable for rural SHG women
+- Suggest actionable next steps"""
+                    },
+                    {"role": "user", "content": query}
+                ],
+                temperature=0.7,
+                max_tokens=200
+            )
+            reply = response.choices[0].message.content.strip()
+            return {"reply": reply, "agent": "VISHWAS"}
+        except Exception:
+            pass
+    
+    reply = f"Agent VISHWAS here! Your Finance & Wallet summary:\n\n"
+    reply += f"{wallet_context}\n\n"
+    reply += "💡 Ways to earn Trust Coins:\n"
+    reply += "• Complete orders on time (+10 coins)\n"
+    reply += "• Get 5-star reviews (+15 coins)\n"
+    reply += "• Refer new members (+20 coins)\n\n"
+    reply += "Go to Wallet page to redeem coins for discounts!"
 
     return {"reply": reply, "agent": "VISHWAS"}
 
 async def sampark_response(query: str, user_data: dict, db: Session) -> Dict:
-    """Get response from Sampark agent"""
+    """Get response from Sampark agent - Community Guide"""
+    user_id = user_data.get("id")
     hierarchy_level = user_data.get("hierarchy_level", "SHG")
     district = user_data.get("district", "Andhra Pradesh")
+    profile_context = await get_user_profile_context(user_id, db) if user_id else "No profile data available."
+    
+    try:
+        recent_posts = db.query(Post).filter(
+            Post.is_announcement == True
+        ).order_by(desc(Post.created_at)).limit(3).all()
+        posts_info = "\n".join([
+            f"• {p.title or p.content[:50]}..." for p in recent_posts
+        ]) if recent_posts else "No recent announcements."
+    except Exception:
+        posts_info = "Unable to fetch community posts."
+    
+    if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "CHANGE_OPENAI_API_KEY":
+        try:
+            response = await client.chat.completions.create(
+                model=settings.OPENAI_MODEL,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"""You are Agent SAMPARK (संपर्क), the Community Guide for the Ooumph SHG marketplace.
 
-    reply = f"Agent Sampark - Community Orchestration\n\n"
+Your capabilities:
+- FEDERATION HIERARCHY: Explain SHG → SLF → TLF structure and roles
+- COMMUNITY POSTS: Share announcements, alerts, and community news
+- PEER SHG CONNECTIONS: Help connect with other SHGs in the district
+- DISTRICT OVERVIEW: Provide information about the local SHG network
+- SUPPORT COORDINATION: Guide users to appropriate federation support
 
+User's Profile Context:
+{profile_context}
+
+User's Hierarchy Level: {hierarchy_level}
+District: {district}
+
+Recent Announcements:
+{posts_info}
+
+Federation Structure:
+- SHG (Self Help Group): Base level, 10-20 members
+- SLF (Slum Level Federation): Cluster of SHGs, coordinator support
+- TLF (Town Level Federation): District leadership, admin portal access
+
+Guidelines:
+- Explain federation structure clearly and simply
+- Guide users to appropriate contacts based on their needs
+- Share relevant community announcements
+- Help SHGs connect with peers for collaboration
+- Mention Admin Portal for TLF/SLF members
+- Keep responses under 100 words
+- Use simple language suitable for rural SHG women
+- Suggest actionable next steps"""
+                    },
+                    {"role": "user", "content": query}
+                ],
+                temperature=0.7,
+                max_tokens=200
+            )
+            reply = response.choices[0].message.content.strip()
+            return {"reply": reply, "agent": "SAMPARK"}
+        except Exception:
+            pass
+    
+    reply = f"Agent SAMPARK here! Your Community Guide for {district}.\n\n"
+    reply += f"👤 Your Level: {hierarchy_level}\n\n"
+    
     if hierarchy_level == "SHG":
-        reply += f"Your SHG is part of the {district} district network.\n\n"
-        reply += "Your federation structure:\n"
-        reply += "• SHG (Your Group)\n"
-        reply += "• SLF (Slum Level Federation) - Your coordinator\n"
-        reply += "• TLF (Town Level Federation) - District leadership\n\n"
-        reply += "For district-level support, contact your SLF coordinator."
+        reply += "🏛️ Federation Structure:\n"
+        reply += "• SHG (Your Group) → Base level\n"
+        reply += "• SLF (Slum Level Federation) → Your coordinator\n"
+        reply += "• TLF (Town Level Federation) → District leadership\n\n"
+        reply += f"📢 Recent Announcements:\n{posts_info}\n\n"
+        reply += "Contact your SLF coordinator for district-level support!"
     else:
-        reply += f"As a {hierarchy_level}, you can view and manage your federation members.\n\n"
-        reply += "Use the Admin Portal to:\n"
-        reply += "• View federation statistics\n"
+        reply += f"As a {hierarchy_level}, you can:\n"
+        reply += "• View and manage federation members\n"
         reply += "• Send community alerts\n"
-        reply += "• Track member performance"
+        reply += "• Track member performance\n\n"
+        reply += "Use the Admin Portal for these features."
 
     return {"reply": reply, "agent": "SAMPARK"}
 
@@ -523,6 +920,11 @@ async def stream_agent_response(
                 if not done:
                     full_response += chunk
                 yield chunk, done
+        elif agent == "SUPPORT":
+            async for chunk, done in _stream_support_response(query, user_data, language):
+                if not done:
+                    full_response += chunk
+                yield chunk, done
         else:
             async for chunk, done in _stream_vaani_response(query, user_data, language):
                 if not done:
@@ -540,7 +942,8 @@ async def stream_agent_response(
 async def _stream_vaani_response(
     query: str,
     user_data: dict,
-    language: str
+    language: str,
+    profile_context: str = "No profile data available."
 ) -> AsyncGenerator[Tuple[str, bool], None]:
     """Stream Vaani agent response using OpenAI streaming API"""
     if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "CHANGE_OPENAI_API_KEY":
@@ -550,33 +953,40 @@ async def _stream_vaani_response(
                 messages=[
                     {
                         "role": "system",
-                        "content": f"""You are Agent Vaani (वाणी), a product-focused AI assistant for SHG women in the Ooumph marketplace ecosystem.
+                        "content": f"""You are Agent VAANI (वाणी), the friendly general assistant for the Ooumph SHG marketplace.
 
-IMPORTANT: You ONLY answer questions about:
+You are ACTION-ORIENTED and HELPFUL. Always guide users toward specific actions they can take.
+
+User's Profile Context:
+{profile_context}
+
+Your primary areas:
 - Products (selling, buying, listing, pricing)
 - Orders and order management
 - Buyers and suppliers
 - Raw materials and procurement
-- Trust scores and badges (related to marketplace transactions)
+- Trust scores and badges
 - Market demand and pricing insights
 - Delivery and shipping
-- Product categories (handicrafts, textiles, food products, etc.)
+- General marketplace navigation
 
 You DO NOT answer questions about:
 - General knowledge, news, weather, sports, entertainment
 - Politics, religion, or personal advice
-- Topics unrelated to the Ooumph marketplace and products
+- Topics unrelated to the Ooumph marketplace
 
-If asked about non-product topics, politely redirect: "I'm here to help with your SHG marketplace needs - products, buyers, orders, and trust scores. Would you like help with any of these?"
+If asked about non-marketplace topics, politely redirect: "I'm here to help with your SHG marketplace needs - products, buyers, orders, and trust scores. What would you like help with?"
 
-Guidelines:
+ACTION-ORIENTED Guidelines:
 - Respond in {language}
 - Be concise (under 80 words)
 - Use simple language for rural women
 - Be encouraging and supportive
 - Use traditional greetings (Namaste, Vanakkam)
-- Focus on practical marketplace advice
-- Guide users to take action (list products, find buyers, etc.)"""
+- ALWAYS suggest a specific action the user can take
+- Guide users to relevant pages: Dashboard, Sell Product, Orders, Wallet, Market Analyzer
+- Mention specific features they can use
+- Provide next steps, not just information"""
                     },
                     {"role": "user", "content": query}
                 ],
@@ -605,7 +1015,9 @@ Guidelines:
 async def _stream_bazaar_response(
     query: str,
     user_data: dict,
-    language: str
+    language: str,
+    profile_context: str = "No profile data available.",
+    market_info: str = "Market data unavailable."
 ) -> AsyncGenerator[Tuple[str, bool], None]:
     """Stream Bazaar Buddhi agent response"""
     district = user_data.get("district", "Andhra Pradesh")
@@ -617,20 +1029,31 @@ async def _stream_bazaar_response(
                 messages=[
                     {
                         "role": "system",
-                        "content": f"""You are Agent Bazaar Buddhi (बाज़ार बुद्धि), a market intelligence specialist for the Ooumph SHG marketplace.
+                        "content": f"""You are Agent BAZAAR (बाज़ार), the Market Expert for the Ooumph SHG marketplace.
 
-You provide:
-- Market demand analysis
-- Price recommendations
-- Seasonal trends
-- Competition analysis
+Your capabilities:
+- MARKET PRICE ANALYSIS: Provide current market prices and trends
+- DEMAND TRENDS: Show what products are in high demand
+- PRODUCT RECOMMENDATIONS: Suggest products to make/sell
+- COMPETITION ANALYSIS: Help understand market positioning
+- SEASONAL INSIGHTS: Advise on best times to sell
+
+User's Profile Context:
+{profile_context}
+
+Market Data for {district}:
+{market_info}
 
 Guidelines:
 - Respond in {language}
-- Be data-driven and specific
-- Include actionable insights
+- Provide specific numbers and percentages when possible
+- Suggest actionable pricing strategies
+- Recommend trending product categories
+- Mention seasonal opportunities
+- Guide users to Market Analyzer for detailed analysis
 - Keep responses under 100 words
-- Mention specific numbers and percentages when possible"""
+- Use simple language suitable for rural SHG women
+- Always suggest next steps"""
                     },
                     {"role": "user", "content": f"User from {district} asks: {query}"}
                 ],
@@ -648,11 +1071,10 @@ Guidelines:
         except Exception:
             pass
     
-    fallback = f"Market Analysis for {district}:\n\n"
+    fallback = f"Agent BAZAAR here! Market insights for {district}:\n\n"
+    fallback += f"📊 Market Trends:\n{market_info}\n\n"
     fallback += f"• Current trends show good demand for handmade products\n"
-    fallback += f"• Consider listing on multiple platforms for better visibility\n"
     fallback += f"• Premium quality products can command 15-20% higher prices\n"
-    fallback += f"• The upcoming festival season is a good time to sell\n\n"
     fallback += "Use the Market Analyzer for detailed insights."
     
     for word in fallback.split():
@@ -665,11 +1087,10 @@ Guidelines:
 async def _stream_jodi_response(
     query: str,
     user_data: dict,
-    language: str
+    language: str,
+    orders_context: str = "No order data available."
 ) -> AsyncGenerator[Tuple[str, bool], None]:
     """Stream Jodi agent response"""
-    trust_score = user_data.get("trust_score", 50)
-    
     if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "CHANGE_OPENAI_API_KEY":
         try:
             stream = await client.chat.completions.create(
@@ -677,20 +1098,28 @@ async def _stream_jodi_response(
                 messages=[
                     {
                         "role": "system",
-                        "content": f"""You are Agent Jodi (जोड़ी), a buyer matching specialist for the Ooumph SHG marketplace.
+                        "content": f"""You are Agent JODI (जोड़ी), the Order Management Specialist for the Ooumph SHG marketplace.
 
-You help with:
-- Matching SHG products with buyers
-- Government procurement opportunities
-- Negotiation support
+Your capabilities:
+- ORDER STATUS QUERIES: Handle "where is my order", "track order", "order status" requests
+- DELIVERY ADDRESS UPDATES: Help with "update delivery address", "change address" requests  
+- ORDER CANCELLATION: Process "cancel order" requests with proper guidance
+- ORDER HISTORY: Show past orders and their details
+
+Current User's Orders Context:
+{orders_context}
 
 Guidelines:
-- Respond in {language}
-- Be practical and specific
-- Mention buyer types and opportunities
-- Keep responses under 100 words"""
+- If user asks about orders without providing order ID, ask for the order number
+- Always guide users to the Orders page for detailed tracking
+- For address changes, explain the process and any time limitations
+- For cancellations, mention any applicable policies
+- Be helpful and action-oriented - suggest next steps
+- Keep responses under 100 words
+- Use simple language suitable for rural SHG women
+- Include relevant order details from the context when available"""
                     },
-                    {"role": "user", "content": f"User with trust score {trust_score} asks: {query}"}
+                    {"role": "user", "content": query}
                 ],
                 temperature=0.7,
                 max_tokens=200,
@@ -706,13 +1135,13 @@ Guidelines:
         except Exception:
             pass
     
-    priority = "priority " if trust_score >= 70 else ""
-    fallback = f"Buyer Matching Results:\n\n"
-    fallback += f"Your trust score is {trust_score}, giving you {priority}access to verified buyers.\n\n"
-    fallback += f"• 3 GeM government tenders matching handicrafts\n"
-    fallback += f"• 5 wholesale buyers interested in SHG products\n"
-    fallback += f"• 2 ONDC marketplace opportunities\n\n"
-    fallback += f"Check 'Sell Product' to connect with buyers!"
+    fallback = f"Agent JODI here! I help with order management.\n\n"
+    fallback += f"📋 Your Recent Orders:\n{orders_context}\n\n"
+    fallback += "I can help you:\n"
+    fallback += "• Track order status\n"
+    fallback += "• Update delivery address\n"
+    fallback += "• Cancel orders\n\n"
+    fallback += "Please provide your order number or go to Orders page."
     
     for word in fallback.split():
         yield word + " ", False
@@ -724,7 +1153,9 @@ Guidelines:
 async def _stream_samagri_response(
     query: str,
     user_data: dict,
-    language: str
+    language: str,
+    profile_context: str = "No profile data available.",
+    suppliers_info: str = "No supplier data available."
 ) -> AsyncGenerator[Tuple[str, bool], None]:
     """Stream Samagri agent response"""
     district = user_data.get("district", "Andhra Pradesh")
@@ -736,18 +1167,30 @@ async def _stream_samagri_response(
                 messages=[
                     {
                         "role": "system",
-                        "content": f"""You are Agent Samagri (सामग्री), a raw material procurement specialist for the Ooumph SHG marketplace.
+                        "content": f"""You are Agent SAMAGRI (सामग्री), the Supplier & Materials Advisor for the Ooumph SHG marketplace.
 
-You help with:
-- Supplier search
-- Bulk purchase coordination
-- Price comparison
+Your capabilities:
+- SUPPLIER SEARCH: Help find verified suppliers for raw materials
+- QUOTE REQUESTS: Guide users on requesting price quotes from suppliers
+- BULK PURCHASE COORDINATION: Help organize group buying to save costs
+- PRICE COMPARISON: Compare materials across different suppliers
+- MATERIAL RECOMMENDATIONS: Suggest quality materials for specific products
+
+User's Profile Context:
+{profile_context}
+
+Available Suppliers in {district}:
+{suppliers_info}
 
 Guidelines:
-- Respond in {language}
-- List specific suppliers with ratings
-- Mention cost-saving opportunities
-- Keep responses under 100 words"""
+- Recommend verified suppliers with good ratings
+- Suggest bulk purchases for cost savings (15-25% typically)
+- Guide users to Raw Materials marketplace for full catalog
+- Explain how to request quotes from suppliers
+- Mention delivery options and timeframes
+- Keep responses under 100 words
+- Use simple language suitable for rural SHG women
+- Always suggest actionable next steps"""
                     },
                     {"role": "user", "content": f"User from {district} asks: {query}"}
                 ],
@@ -765,12 +1208,10 @@ Guidelines:
         except Exception:
             pass
     
-    fallback = f"Raw Material Suppliers in {district}:\n\n"
-    fallback += f"• Guntur Agro Traders - Agricultural supplies (4.5★)\n"
-    fallback += f"• Cooperative Mills Ltd - Textile materials (4.3★)\n"
-    fallback += f"• Kurnool Farmers Co-op - Organic inputs (4.6★)\n\n"
-    fallback += f"💡 Join bulk requests to save 15-25%!\n\n"
-    fallback += f"Visit Raw Materials marketplace for details."
+    fallback = f"Agent SAMAGRI here! Your Supplier & Materials guide for {district}.\n\n"
+    fallback += f"📦 Verified Suppliers:\n{suppliers_info}\n\n"
+    fallback += "💡 Tip: Join bulk requests to save 15-25% on materials!\n\n"
+    fallback += "Visit Raw Materials marketplace to browse all options!"
     
     for word in fallback.split():
         yield word + " ", False
@@ -782,13 +1223,10 @@ Guidelines:
 async def _stream_vishwas_response(
     query: str,
     user_data: dict,
-    language: str
+    language: str,
+    wallet_context: str = "No wallet data available."
 ) -> AsyncGenerator[Tuple[str, bool], None]:
     """Stream Vishwas agent response"""
-    trust_score = user_data.get("trust_score", 50)
-    trust_coins = user_data.get("trust_coins", 0)
-    badge = user_data.get("trust_badge", "Bronze")
-    
     if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "CHANGE_OPENAI_API_KEY":
         try:
             stream = await client.chat.completions.create(
@@ -796,23 +1234,27 @@ async def _stream_vishwas_response(
                 messages=[
                     {
                         "role": "system",
-                        "content": f"""You are Agent Vishwas (विश्वास), a trust and compliance specialist for the Ooumph SHG marketplace.
+                        "content": f"""You are Agent VISHWAS (विश्वास), the Finance & Wallet Specialist for the Ooumph SHG marketplace.
 
-You provide:
-- Trust score information
-- Audit and compliance guidance
-- Trust coin balance updates
+Your capabilities:
+- BALANCE QUERIES: Handle "what is my balance", "trust coins", "how many coins" requests
+- TRANSACTION HISTORY: Show recent transactions and their details
+- WALLET CONNECTION HELP: Guide users on connecting and using their wallet
+- REDEMPTION GUIDANCE: Explain how to redeem trust coins for benefits
+- TRUST SCORE EXPLANATIONS: Explain trust badges and how to improve them
 
-Current user status:
-- Trust Score: {trust_score}/100
-- Badge: {badge}
-- Trust Coins: {trust_coins}
+Current User's Wallet Context:
+{wallet_context}
 
 Guidelines:
-- Respond in {language}
-- Be informative about trust system
-- Explain how to improve trust score
-- Keep responses under 100 words"""
+- Always provide current balance when asked
+- Explain trust coin earning opportunities (completing orders, referrals, etc.)
+- Guide users to Wallet page for full transaction history
+- Explain redemption options clearly (discounts, premium features, etc.)
+- Be encouraging about improving trust scores
+- Keep responses under 100 words
+- Use simple language suitable for rural SHG women
+- Suggest actionable next steps"""
                     },
                     {"role": "user", "content": query}
                 ],
@@ -830,19 +1272,13 @@ Guidelines:
         except Exception:
             pass
     
-    fallback = f"Trust & Compliance Status:\n\n"
-    fallback += f"📊 Trust Score: {trust_score}/100\n"
-    fallback += f"🏅 Badge: {badge}\n"
-    fallback += f"💰 Trust Coins: {trust_coins}\n\n"
-    
-    if trust_score >= 90:
-        fallback += "Excellent! You're a Gold badge member!"
-    elif trust_score >= 70:
-        fallback += "Great progress! Maintain performance for Gold."
-    else:
-        fallback += "Complete more orders on time to improve!"
-    
-    fallback += "\n\nYour trust score affects buyer matching and premium access."
+    fallback = f"Agent VISHWAS here! Your Finance & Wallet summary:\n\n"
+    fallback += f"{wallet_context}\n\n"
+    fallback += "💡 Ways to earn Trust Coins:\n"
+    fallback += "• Complete orders on time (+10 coins)\n"
+    fallback += "• Get 5-star reviews (+15 coins)\n"
+    fallback += "• Refer new members (+20 coins)\n\n"
+    fallback += "Go to Wallet page to redeem coins for discounts!"
     
     for word in fallback.split():
         yield word + " ", False
@@ -854,7 +1290,9 @@ Guidelines:
 async def _stream_sampark_response(
     query: str,
     user_data: dict,
-    language: str
+    language: str,
+    profile_context: str = "No profile data available.",
+    posts_info: str = "No recent announcements."
 ) -> AsyncGenerator[Tuple[str, bool], None]:
     """Stream Sampark agent response"""
     hierarchy_level = user_data.get("hierarchy_level", "SHG")
@@ -867,22 +1305,38 @@ async def _stream_sampark_response(
                 messages=[
                     {
                         "role": "system",
-                        "content": f"""You are Agent Sampark (संपर्क), a community orchestration specialist for the Ooumph SHG marketplace.
+                        "content": f"""You are Agent SAMPARK (संपर्क), the Community Guide for the Ooumph SHG marketplace.
 
-You provide:
-- Federation hierarchy information
-- Community alerts
-- District overview
+Your capabilities:
+- FEDERATION HIERARCHY: Explain SHG → SLF → TLF structure and roles
+- COMMUNITY POSTS: Share announcements, alerts, and community news
+- PEER SHG CONNECTIONS: Help connect with other SHGs in the district
+- DISTRICT OVERVIEW: Provide information about the local SHG network
+- SUPPORT COORDINATION: Guide users to appropriate federation support
 
-User context:
-- Hierarchy Level: {hierarchy_level}
-- District: {district}
+User's Profile Context:
+{profile_context}
+
+User's Hierarchy Level: {hierarchy_level}
+District: {district}
+
+Recent Announcements:
+{posts_info}
+
+Federation Structure:
+- SHG (Self Help Group): Base level, 10-20 members
+- SLF (Slum Level Federation): Cluster of SHGs, coordinator support
+- TLF (Town Level Federation): District leadership, admin portal access
 
 Guidelines:
-- Respond in {language}
-- Explain federation structure clearly
-- Provide contact guidance
-- Keep responses under 100 words"""
+- Explain federation structure clearly and simply
+- Guide users to appropriate contacts based on their needs
+- Share relevant community announcements
+- Help SHGs connect with peers for collaboration
+- Mention Admin Portal for TLF/SLF members
+- Keep responses under 100 words
+- Use simple language suitable for rural SHG women
+- Suggest actionable next steps"""
                     },
                     {"role": "user", "content": query}
                 ],
@@ -900,21 +1354,101 @@ Guidelines:
         except Exception:
             pass
     
-    fallback = f"Community Information:\n\n"
+    fallback = f"Agent SAMPARK here! Your Community Guide for {district}.\n\n"
+    fallback += f"👤 Your Level: {hierarchy_level}\n\n"
     
     if hierarchy_level == "SHG":
-        fallback += f"Your SHG is part of the {district} district network.\n\n"
-        fallback += f"Federation structure:\n"
-        fallback += f"• SHG (Your Group)\n"
-        fallback += f"• SLF (Slum Level Federation)\n"
-        fallback += f"• TLF (Town Level Federation)\n\n"
-        fallback += f"Contact your SLF coordinator for district support."
+        fallback += "🏛️ Federation Structure:\n"
+        fallback += "• SHG (Your Group) → Base level\n"
+        fallback += "• SLF (Slum Level Federation) → Your coordinator\n"
+        fallback += "• TLF (Town Level Federation) → District leadership\n\n"
+        fallback += f"📢 Recent Announcements:\n{posts_info}\n\n"
+        fallback += "Contact your SLF coordinator for district-level support!"
     else:
-        fallback += f"As a {hierarchy_level}, you can manage federation members.\n\n"
-        fallback += f"Use the Admin Portal to:\n"
-        fallback += f"• View federation statistics\n"
-        fallback += f"• Send community alerts\n"
-        fallback += f"• Track member performance"
+        fallback += f"As a {hierarchy_level}, you can:\n"
+        fallback += "• View and manage federation members\n"
+        fallback += "• Send community alerts\n"
+        fallback += "• Track member performance\n\n"
+        fallback += "Use the Admin Portal for these features."
+    
+    for word in fallback.split():
+        yield word + " ", False
+        import asyncio
+        await asyncio.sleep(0.02)
+    yield "", True
+
+
+async def _stream_support_response(
+    query: str,
+    user_data: dict,
+    language: str,
+    profile_context: str = "No profile data available."
+) -> AsyncGenerator[Tuple[str, bool], None]:
+    """Stream Support agent response"""
+    if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "CHANGE_OPENAI_API_KEY":
+        try:
+            stream = await client.chat.completions.create(
+                model=settings.OPENAI_MODEL,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"""You are Agent SUPPORT, the Navigation & Help Specialist for the Ooumph SHG marketplace.
+
+Your capabilities:
+- APP NAVIGATION: Help users find and use different features
+- FEATURE EXPLANATIONS: Explain how marketplace features work
+- TROUBLESHOOTING: Guide users through common issues
+- ONBOARDING HELP: Assist new users with getting started
+- BUG REPORTING: Guide users on how to report issues
+
+User's Profile Context:
+{profile_context}
+
+App Navigation Guide:
+- Dashboard: Home screen with overview
+- Sell Product: Add and manage your product listings
+- My Products: View and edit your listed products
+- Orders: Track and manage orders
+- Market Analyzer: View market trends and pricing
+- Raw Materials: Find suppliers and materials
+- Wallet: Trust coins and transactions
+- Community: Connect with other SHGs
+- Profile: Manage your account settings
+
+Guidelines:
+- Respond in {language}
+- Provide clear step-by-step navigation instructions
+- Be patient and helpful
+- Use simple language suitable for rural SHG women
+- Suggest specific pages and features to try
+- Keep responses under 100 words
+- Always offer to help with follow-up questions"""
+                    },
+                    {"role": "user", "content": query}
+                ],
+                temperature=0.7,
+                max_tokens=200,
+                stream=True
+            )
+            
+            async for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content, False
+            
+            yield "", True
+            return
+        except Exception:
+            pass
+    
+    fallback = "Agent SUPPORT here! I can help you navigate the app.\n\n"
+    fallback += "📱 Quick Navigation Guide:\n"
+    fallback += "• Dashboard → Your home screen\n"
+    fallback += "• Sell Product → Add new products\n"
+    fallback += "• Orders → Track your orders\n"
+    fallback += "• Market Analyzer → Check prices & trends\n"
+    fallback += "• Raw Materials → Find suppliers\n"
+    fallback += "• Wallet → View trust coins\n\n"
+    fallback += "What would you like help with?"
     
     for word in fallback.split():
         yield word + " ", False
