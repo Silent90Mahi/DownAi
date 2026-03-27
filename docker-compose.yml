@@ -34,7 +34,7 @@ services:
       dockerfile: Dockerfile
       target: production
       args:
-        - VITE_API_BASE_URL=http://135.222.42.174:6002
+        - VITE_API_BASE_URL=
     container_name: ooumph-frontend
     ports:
       - "6001:80"
