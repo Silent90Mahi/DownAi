@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Dict, Optional, AsyncGenerator, Any, Tuple
 from openai import AsyncOpenAI
 from sqlalchemy.orm import Session
-from . import voice_service, market_service, matching_service, supplier_service
+from . import market_service, matching_service, supplier_service
 from .. import models
 from ..models import Order, CoinTransaction, User, Product, Post, Supplier, Material
 from core.config import settings

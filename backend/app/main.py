@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 import os
@@ -9,7 +8,7 @@ from . import models
 from core.config import settings
 
 # Import all routers
-from .routers import auth, chat, products, orders, voice
+from .routers import auth, chat, products, orders
 from .routers import market, matching, suppliers, trust, community
 from .routers import payments, analytics, notifications, reports, websocket, sync
 from .routers import recommendations, posts
@@ -49,25 +48,9 @@ app.add_middleware(
 # GZip middleware for response compression
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Mount static files for uploads
-uploads_dir = os.getenv("UPLOADS_DIR", "/app/uploads")
-try:
-    os.makedirs(uploads_dir, exist_ok=True)
-    os.makedirs(f"{uploads_dir}/audio", exist_ok=True)
-    os.makedirs(f"{uploads_dir}/images", exist_ok=True)
-except PermissionError:
-    # Use temp directory if no permission
-    import tempfile
-    uploads_dir = os.path.join(tempfile.gettempdir(), "ooumph_uploads")
-    os.makedirs(uploads_dir, exist_ok=True)
-    os.makedirs(f"{uploads_dir}/audio", exist_ok=True)
-    os.makedirs(f"{uploads_dir}/images", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
-
 # Include all routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(chat.router, prefix="/api/chat", tags=["Chat/Vaani"])
-app.include_router(voice.router, prefix="/api/voice", tags=["Voice"])
 app.include_router(products.router, prefix="/api/products", tags=["Products"])
 app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
 app.include_router(market.router, prefix="/api/market", tags=["Market Intelligence"])

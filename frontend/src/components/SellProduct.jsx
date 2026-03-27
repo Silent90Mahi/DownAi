@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { UploadCloud, Mic, ArrowRight, Tag, Loader2, ArrowLeft } from 'lucide-react';
+import { ArrowRight, Tag, Loader2, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { productsAPI, marketAPI, voiceAPI } from '../services/api';
+import { productsAPI, marketAPI } from '../services/api';
 
 const fieldStyle = {
   width: '100%', padding: '0.7rem 1rem',
@@ -27,27 +27,12 @@ const SellProduct = () => {
     name: '', description: '', category: 'Handicrafts',
     quantity: '', unit: 'pcs', price: '', district: user?.district || 'Hyderabad',
   });
-  const [image, setImage] = useState(null);
-  const [preview, setPreview] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [marketAnalysis, setMarketAnalysis] = useState(null);
 
   const f = (k) => (e) => setFormData(p => ({ ...p, [k]: e.target.value }));
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) { setImage(file); setPreview(URL.createObjectURL(file)); }
-  };
-
-  const handleVoiceInput = async () => {
-    alert('Voice input: Recording for 5 seconds...');
-    try {
-      await voiceAPI.transcribe('');
-      setFormData(p => ({ ...p, description: 'Handwoven organic cotton product with traditional patterns.' }));
-    } catch { console.error('Voice transcription failed'); }
-  };
 
   const handlePredictDemand = async () => {
     if (!formData.name) { alert('Please enter a product name first'); return; }
@@ -69,7 +54,6 @@ const SellProduct = () => {
     if (!formData.category)                  { alert('Please select a category'); return; }
     if (!formData.quantity || parseInt(formData.quantity) <= 0) { alert('Please enter a valid quantity'); return; }
     if (!formData.price || parseFloat(formData.price) <= 0)     { alert('Please enter a valid price'); return; }
-    if (!image || typeof image !== 'object' || !image.name)     { alert('Please upload a product image'); return; }
     try {
       setSubmitting(true);
       const productData = new FormData();
@@ -80,7 +64,6 @@ const SellProduct = () => {
       productData.append('unit', formData.unit);
       productData.append('price', parseFloat(formData.price));
       productData.append('district', formData.district);
-      if (image instanceof File) productData.append('image', image);
       await productsAPI.create(productData);
       setSubmitted(true);
       setTimeout(() => navigate('/marketplace'), 2000);
@@ -111,20 +94,6 @@ const SellProduct = () => {
 
       <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '1.25rem', padding: '2rem', backdropFilter: 'blur(16px)' }}>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-          {/* Image Upload */}
-          <div style={{ border: '2px dashed rgba(139,92,246,0.3)', borderRadius: 12, padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(139,92,246,0.04)', cursor: 'pointer', position: 'relative', transition: 'all 0.2s', minHeight: 180 }}>
-            {preview ? (
-              <img src={preview} alt="Preview" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 8 }} />
-            ) : (
-              <>
-                <UploadCloud size={44} style={{ color: '#8b5cf6', marginBottom: 10 }} />
-                <p style={{ fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 4px' }}>Upload Product Photo</p>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>Tap to browse files</p>
-              </>
-            )}
-            <input type="file" accept="image/*" onChange={handleImageUpload} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
-          </div>
-
           <div>
             <label style={labelStyle}>Product Name</label>
             <input type="text" required value={formData.name} onChange={f('name')} style={fieldStyle} placeholder="Product Name" onFocus={onFocus} onBlur={onBlur} />
@@ -132,12 +101,7 @@ const SellProduct = () => {
 
           <div>
             <label style={labelStyle}>Description</label>
-            <div style={{ position: 'relative' }}>
-              <textarea rows="3" required value={formData.description} onChange={f('description')} style={{ ...fieldStyle, resize: 'none', paddingRight: '3.5rem' }} placeholder="Describe your product (or use voice)" onFocus={onFocus} onBlur={onBlur} />
-              <button type="button" onClick={handleVoiceInput} style={{ position: 'absolute', bottom: 10, right: 10, width: 34, height: 34, borderRadius: '50%', background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.35)', color: '#c4b5fd', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Voice Input">
-                <Mic size={16} />
-              </button>
-            </div>
+            <textarea rows="3" required value={formData.description} onChange={f('description')} style={{ ...fieldStyle, resize: 'none' }} placeholder="Describe your product" onFocus={onFocus} onBlur={onBlur} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>

@@ -70,18 +70,6 @@ export const chatAPI = {
 };
 
 // ============================================================================
-// VOICE API
-// ============================================================================
-
-export const voiceAPI = {
-  transcribe: (audioData, language = 'auto') =>
-    api.post('/api/voice/transcribe', { audio_data: audioData, language }),
-  synthesize: (text, language = 'English', voice = 'alloy') =>
-    api.post('/api/voice/synthesize', { text, language, voice }),
-  getLanguages: () => api.get('/api/voice/languages'),
-};
-
-// ============================================================================
 // PRODUCTS API
 // ============================================================================
 

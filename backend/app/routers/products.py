@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Form, File, UploadFile, Query
+from fastapi import APIRouter, Depends, HTTPException, Form, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 from typing import List, Optional
@@ -33,31 +33,23 @@ async def create_product(
     description: Optional[str] = Form(None),
     category: str = Form(...),
     price: float = Form(...),
-    quantity: int = Form(...),  # Maps to stock
+    quantity: int = Form(...),
     unit: str = Form("piece"),
     district: Optional[str] = Form(None),
-    image: Optional[UploadFile] = File(None),
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Create a new product with image upload support"""
-    # Handle image upload if present
-    image_url = None
-    if image:
-        # In production, upload to cloud storage and get URL
-        # For now, just store the filename
-        image_url = f"/uploads/products/{image.filename}"
-
+    """Create a new product"""
     new_product = models.Product(
         name=name,
         description=description,
         category=category,
         subcategory=None,
         price=price,
-        stock=quantity,  # quantity maps to stock
+        stock=quantity,
         min_order_quantity=1,
         unit=unit,
-        images=[image_url] if image_url else [],
+        images=[],
         tags=[],
         seller_id=current_user.id,
         status=models.ProductStatus.ACTIVE
@@ -156,11 +148,10 @@ async def update_product(
     quantity: Optional[int] = Form(None),
     unit: Optional[str] = Form(None),
     district: Optional[str] = Form(None),
-    image: Optional[UploadFile] = File(None),
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Update a product with optional image upload"""
+    """Update a product"""
     product = db.query(models.Product).filter(
         models.Product.id == product_id
     ).first()
@@ -187,11 +178,6 @@ async def update_product(
         product.unit = unit
     if district is not None:
         product.district = district
-
-    # Handle image upload if present
-    if image:
-        image_url = f"/uploads/products/{image.filename}"
-        product.images = [image_url]
 
     product.updated_at = datetime.now()
     db.commit()

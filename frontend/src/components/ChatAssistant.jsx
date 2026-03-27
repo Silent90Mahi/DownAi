@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, X, Bot, Mic, Volume2, Loader2, ChevronLeft, History, Sparkles, ShoppingCart, TrendingUp, Users, Heart, Wallet, HelpCircle, Package } from 'lucide-react';
-import { chatAPI, voiceAPI } from '../services/api';
+import { MessageSquare, Send, X, Bot, Loader2, History, TrendingUp, Users, Heart, Wallet, HelpCircle, Package } from 'lucide-react';
+import { chatAPI } from '../services/api';
 
 const AGENTS = [
   { id: 'VAANI', name: 'Vaani', title: 'General Assistant', icon: Bot, color: '#8b5cf6', description: 'General help & guidance' },
@@ -29,36 +29,6 @@ const QUICK_ACTIONS = [
   { id: 'market_price', label: '📊 Market Price', message: 'What is the current market price for handicrafts?' },
 ];
 
-const PROJECT_KNOWLEDGE = `
-You are part of the Ooumph SHG Marketplace ecosystem. Here's what you know about the app:
-
-**MODULES:**
-1. **Marketplace** - Buy and sell products, browse categories (handicrafts, textiles, food, etc.)
-2. **My Orders** - Track orders, view history, cancel orders, see delivery status
-3. **Market Analyzer** - View price trends, demand analysis, AI-powered market predictions
-4. **Supplier Network** - Find suppliers, compare prices, join bulk requests, rate suppliers
-5. **Community Hub** - Post updates, comment, like, view federation hierarchy
-6. **Trust Wallet** - View trust coins, transaction history, connect crypto wallet, redeem rewards
-
-**USER ROLES:**
-- SHG (Self Help Group) members
-- SLF (Slum Level Federation) coordinators
-- TLF (Town Level Federation) admins
-- Buyers and Suppliers
-
-**KEY FEATURES:**
-- Trust score system (0-100) with Bronze/Silver/Gold badges
-- Trust coins earned through orders, reviews, training
-- Multi-language support (English, Hindi, Telugu, Tamil)
-- Voice input/output support
-- Real-time chat with AI agents
-
-**AI AGENTS:**
-- Vaani (General), Market Expert, Order Assistant, Supplier Advisor, Community Guide, Finance Assistant, Support Bot
-
-When users ask about the app, refer to these modules and features.
-`;
-
 const ChatAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [showAgents, setShowAgents] = useState(false);
@@ -71,7 +41,6 @@ const ChatAssistant = () => {
   ]);
   const [chatHistory, setChatHistory] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [recording, setRecording] = useState(false);
   const [currentResponse, setCurrentResponse] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState(null);
@@ -129,101 +98,9 @@ const ChatAssistant = () => {
   };
 
   const getErrorMessage = (err) => {
-    if (!navigator.onLine) {
-      return '🌐 You appear to be offline. Please check your internet connection and try again.';
-    }
-    if (err?.response?.status === 401) {
-      return '🔐 Your session has expired. Please log in again to continue.';
-    }
-    if (err?.response?.status === 429) {
-      return '⏳ Too many requests. Please wait a moment and try again.';
-    }
-    if (err?.response?.status >= 500) {
-      return '🔧 Our servers are experiencing issues. Please try again in a few minutes.';
-    }
-    return '❌ Something went wrong. Please try again or contact support if the problem persists.';
-  };
-
-  const handleSend = async (e) => {
-    e.preventDefault();
-    if (!message.trim() || loading) return;
-    const userMsg = message;
-    setMessage('');
-    setError(null);
-    const newLog = [...chatLog, { role: 'user', content: userMsg }];
-    setChatLog(newLog);
-    setLoading(true); setStreaming(true); setCurrentResponse('');
-
-    try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:6002';
-      const token = localStorage.getItem('token');
-      const eventSource = new EventSource(
-        `${API_BASE_URL}/api/chat/stream?query=${encodeURIComponent(userMsg)}&language=${language}&agent=${selectedAgent.id}`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
-      let fullResponse = '';
-      eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.error) {
-          setError(data.error);
-          setChatLog(prev => [...prev, { role: 'assistant', content: getErrorMessage({ response: { status: 400 } }) + '\n\n*Error: ' + data.error + '*', agent: selectedAgent.id, isError: true }]);
-          setStreaming(false); setLoading(false); eventSource.close(); return;
-        }
-        if (data.content) { fullResponse += data.content; setCurrentResponse(fullResponse); }
-        if (data.done) {
-          const finalLog = [...newLog, { role: 'assistant', content: fullResponse, agent: selectedAgent.id }];
-          setChatLog(finalLog);
-          saveToHistory(finalLog);
-          setCurrentResponse(''); setStreaming(false); setLoading(false); eventSource.close();
-        }
-      };
-      eventSource.onerror = async (err) => {
-        eventSource.close();
-        try {
-          const res = await chatAPI.sendMessage(userMsg, language);
-          const finalLog = [...newLog, { role: 'assistant', content: res.data.reply || res.data.response, agent: res.data.agent_triggered || selectedAgent.id }];
-          setChatLog(finalLog);
-          saveToHistory(finalLog);
-        } catch (catchErr) {
-          setError(catchErr);
-          setChatLog(prev => [...prev, { role: 'assistant', content: getErrorMessage(catchErr), agent: selectedAgent.id, isError: true }]);
-        }
-        finally { setCurrentResponse(''); setStreaming(false); setLoading(false); }
-      };
-    } catch (err) {
-      try {
-        const res = await chatAPI.sendMessage(userMsg, language);
-        const finalLog = [...newLog, { role: 'assistant', content: res.data.reply || res.data.response, agent: res.data.agent_triggered || selectedAgent.id }];
-        setChatLog(finalLog);
-        saveToHistory(finalLog);
-      } catch (catchErr) {
-        setError(catchErr);
-        setChatLog(prev => [...prev, { role: 'assistant', content: getErrorMessage(catchErr), agent: selectedAgent.id, isError: true }]);
-      }
-      finally { setCurrentResponse(''); setStreaming(false); setLoading(false); }
-    }
-  };
-
-  const handleVoiceInput = async () => {
-    if (recording) return;
-    try {
-      setRecording(true);
-      alert('Recording... Speak now!');
-      setTimeout(async () => {
-        try {
-          const response = await voiceAPI.transcribe('');
-          if (response.data.transcript) setMessage(response.data.transcript);
-        } catch { console.error('Voice transcription failed'); }
-        finally { setRecording(false); }
-      }, 2000);
-    } catch { setRecording(false); }
-  };
-
-  const handleVoicePlayback = async (text) => {
-    try {
-      const response = await voiceAPI.synthesize(text, language);
-      if (response.data.audio_url) new Audio(response.data.audio_url).play();
-    } catch { console.error('Voice playback failed'); }
+    if (err.response?.data?.detail) return err.response.data.detail;
+    if (err.message) return err.message;
+    return 'An unexpected error occurred. Please try again.';
   };
 
   const loadHistorySession = (session) => {
@@ -236,6 +113,33 @@ const ChatAssistant = () => {
   const clearHistory = () => {
     setChatHistory([]);
     localStorage.removeItem('chatHistory');
+  };
+
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!message.trim() || loading) return;
+
+    const userMessage = message.trim();
+    setMessage('');
+    setChatLog(prev => [...prev, { role: 'user', content: userMessage }]);
+    setLoading(true);
+    setError(null);
+    setCurrentResponse('');
+    setStreaming(true);
+
+    try {
+      const response = await chatAPI.send(userMessage, selectedAgent.id, language);
+      const assistantMessage = response.data.response || response.data.message || 'I understand your request. How can I help you further?';
+      setChatLog(prev => [...prev, { role: 'assistant', content: assistantMessage, agent: selectedAgent.id }]);
+      saveToHistory([...chatLog, { role: 'user', content: userMessage }, { role: 'assistant', content: assistantMessage, agent: selectedAgent.id }]);
+    } catch (err) {
+      setError(err);
+      setChatLog(prev => [...prev, { role: 'assistant', content: getErrorMessage(err), isError: true }]);
+    } finally {
+      setLoading(false);
+      setStreaming(false);
+      setCurrentResponse('');
+    }
   };
 
   const FAB_BOTTOM = 90;
@@ -359,7 +263,6 @@ const ChatAssistant = () => {
 
           {/* Messages */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            {/* Quick prompts for selected agent */}
             {chatLog.length === 1 && (
               <div style={{ marginBottom: 6 }}>
                 <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>
@@ -394,19 +297,7 @@ const ChatAssistant = () => {
                       🤖 {AGENTS.find(a => a.id === msg.agent)?.name || msg.agent}
                     </div>
                   )}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                    <div style={{ flex: 1, whiteSpace: 'pre-line' }}>{msg.content}</div>
-                    {msg.role === 'assistant' && !msg.isError && (
-                      <button onClick={() => handleVoicePlayback(msg.content)} style={{ flexShrink: 0, padding: 2, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
-                        <Volume2 size={12} />
-                      </button>
-                    )}
-                    {msg.isError && (
-                      <button onClick={() => { setError(null); }} style={{ flexShrink: 0, padding: 2, border: 'none', background: 'none', cursor: 'pointer', color: '#fca5a5' }}>
-                        <X size={12} />
-                      </button>
-                    )}
-                  </div>
+                  <div style={{ whiteSpace: 'pre-line' }}>{msg.content}</div>
                 </div>
               </div>
             ))}
@@ -450,15 +341,6 @@ const ChatAssistant = () => {
             padding: '0.6rem 0.8rem', borderTop: `1px solid ${selectedAgent.color}15`,
             background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 8,
           }}>
-            <button type="button" onClick={handleVoiceInput} disabled={recording} style={{
-              width: 34, height: 34, borderRadius: '50%', border: `1px solid ${recording ? '#ef444430' : selectedAgent.color + '20'}`,
-              background: recording ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)',
-              color: recording ? '#fca5a5' : selectedAgent.color, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', flexShrink: 0,
-            }}>
-              <Mic size={14} />
-            </button>
-
             <input type="text" value={message} onChange={(e) => setMessage(e.target.value)} placeholder={`Ask ${selectedAgent.name}...`} style={{
               flex: 1, padding: '0.5rem 0.8rem', background: 'rgba(255,255,255,0.06)',
               border: `1px solid ${selectedAgent.color}20`, borderRadius: 99, outline: 'none',

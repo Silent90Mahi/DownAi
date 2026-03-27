@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { productsAPI, marketAPI } from '../services/api';
-import { UploadCloud, Mic, Loader2, ArrowLeft, Save, Sparkles } from 'lucide-react';
+import { Loader2, ArrowLeft, Save, Sparkles } from 'lucide-react';
 
 const glass = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '1.25rem', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' };
 const inputStyle = { width: '100%', padding: '0.85rem 1rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.22)', borderRadius: 12, outline: 'none', color: 'var(--text-primary)', fontSize: '0.95rem', transition: 'all 0.2s' };
@@ -16,8 +16,6 @@ const ProductEdit = () => {
   const [saving, setSaving] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [marketAnalysis, setMarketAnalysis] = useState(null);
-  const [image, setImage] = useState(null);
-  const [preview, setPreview] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -46,28 +44,23 @@ const ProductEdit = () => {
         name: product.name || '',
         description: product.description || '',
         category: product.category || 'Handicrafts',
-        quantity: product.quantity?.toString() || '',
+        quantity: product.quantity?.toString() || product.stock?.toString() || '',
         unit: product.unit || 'pcs',
         price: product.price?.toString() || '',
         district: product.district || user?.district || 'Hyderabad'
       });
-      if (product.image_url) setPreview(product.image_url);
-    } catch { navigate('/marketplace'); }
-    finally { setLoading(false); }
-  };
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) { setImage(file); setPreview(URL.createObjectURL(file)); }
-  };
-
-  const handleVoiceInput = () => {
-    alert('Voice input: Recording for 5 seconds...');
-    setFormData(prev => ({ ...prev, description: 'Handwoven organic cotton product with traditional patterns.' }));
+    } catch {
+      navigate('/marketplace');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePredictDemand = async () => {
-    if (!formData.name) { alert('Please enter a product name first'); return; }
+    if (!formData.name) {
+      alert('Please enter a product name first');
+      return;
+    }
     try {
       setAnalyzing(true);
       const r = await marketAPI.analyze(formData.name, formData.category, formData.district, formData.price ? parseFloat(formData.price) : null);
@@ -76,13 +69,19 @@ const ProductEdit = () => {
         const avg = Math.round((r.data.recommended_price_min + (r.data.recommended_price_max || r.data.recommended_price_min)) / 2);
         setFormData(prev => ({ ...prev, price: avg.toString() }));
       }
-    } catch { alert('AI analysis failed'); }
-    finally { setAnalyzing(false); }
+    } catch {
+      alert('AI analysis failed');
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name?.trim() || !formData.quantity || !formData.price) { alert('Please fill in all required fields'); return; }
+    if (!formData.name?.trim() || !formData.quantity || !formData.price) {
+      alert('Please fill in all required fields');
+      return;
+    }
     try {
       setSaving(true);
       const pd = new FormData();
@@ -93,12 +92,14 @@ const ProductEdit = () => {
       pd.append('unit', formData.unit);
       pd.append('price', parseFloat(formData.price));
       pd.append('district', formData.district);
-      if (image instanceof File) pd.append('image', image);
       await productsAPI.update(productId, pd);
       alert('Product updated!');
       navigate(`/products/${productId}`);
-    } catch { alert('Update failed'); }
-    finally { setSaving(false); }
+    } catch {
+      alert('Update failed');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) return (
@@ -111,34 +112,20 @@ const ProductEdit = () => {
   return (
     <div className="animate-fade-in" style={{ padding: '1.5rem', maxWidth: 700, margin: '0 auto', paddingBottom: '6rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 15, marginBottom: '2rem' }}>
-        <button onClick={() => navigate(`/products/${productId}`)} style={{ p: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 10, color: 'var(--text-muted)', cursor: 'pointer', padding: '0.5rem' }}><ArrowLeft size={20} /></button>
+        <button onClick={() => navigate(`/products/${productId}`)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 10, color: 'var(--text-muted)', cursor: 'pointer', padding: '0.5rem' }}><ArrowLeft size={20} /></button>
         <h1 style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>Edit Product</h1>
       </div>
 
       <div style={{ ...glass, padding: '2rem' }}>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* Image */}
-          <div style={{ position: 'relative', height: 200, background: 'rgba(0,0,0,0.2)', border: '1px dashed rgba(139,92,246,0.3)', borderRadius: 15, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {preview ? (
-              <img src={preview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <div style={{ textAlign: 'center' }}>
-                <UploadCloud size={40} style={{ color: 'rgba(139,92,246,0.4)', marginBottom: 8 }} />
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Change Product Photo</p>
-              </div>
-            )}
-            <input type="file" accept="image/*" onChange={handleImageUpload} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
-          </div>
-
           <div>
             <label style={labelStyle}>Product Name</label>
             <input type="text" required value={formData.name} onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))} style={inputStyle} placeholder="e.g. Handmade Silk Saree" onFocus={e => e.target.style.border = '1px solid #8b5cf6'} onBlur={e => e.target.style.border = '1px solid rgba(139,92,246,0.22)'} />
           </div>
 
-          <div style={{ position: 'relative' }}>
+          <div>
             <label style={labelStyle}>Description</label>
-            <textarea rows="3" value={formData.description} onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))} style={{ ...inputStyle, resize: 'none', pr: 50 }} placeholder="Describe your product heritage..." />
-            <button type="button" onClick={handleVoiceInput} style={{ position: 'absolute', bottom: 10, right: 10, width: 36, height: 36, background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '50%', color: '#c4b5fd', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }} title="Use Voice AI"><Mic size={18} /></button>
+            <textarea rows="3" value={formData.description} onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))} style={{ ...inputStyle, resize: 'none' }} placeholder="Describe your product heritage..." />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

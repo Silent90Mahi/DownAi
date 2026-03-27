@@ -16,22 +16,17 @@ class PostCreate(BaseModel):
     post_type: str = "general"
     category: Optional[str] = None
     tags: Optional[List[str]] = None
-    images: Optional[List[str]] = None
-    video_url: Optional[str] = None
 
 
 class PostResponse(BaseModel):
     id: int
     author_id: int
     author_name: str
-    author_image: Optional[str]
     title: Optional[str]
     content: str
     post_type: str
     category: Optional[str]
     tags: Optional[List[str]]
-    images: Optional[List[str]]
-    video_url: Optional[str]
     likes_count: int
     comments_count: int
     shares_count: int
@@ -112,8 +107,6 @@ def get_posts(
             "post_type": post.post_type,
             "category": post.category,
             "tags": post.tags or [],
-            "images": post.images or [],
-            "video_url": post.video_url,
             "likes_count": post.likes_count or 0,
             "comments_count": post.comments_count or 0,
             "shares_count": post.shares_count or 0,
@@ -159,8 +152,6 @@ def create_post(
         "post_type": post.post_type,
         "category": post.category,
         "tags": post.tags or [],
-        "images": post.images or [],
-        "video_url": post.video_url,
         "likes_count": 0,
         "comments_count": 0,
         "shares_count": 0,
@@ -343,7 +334,6 @@ def create_comment(
         "author_image": current_user.profile_image,
         "parent_id": comment.parent_id,
         "content": comment.content,
-        "image_url": comment.image_url,
         "likes_count": 0,
         "replies_count": 0,
         "is_liked": False,

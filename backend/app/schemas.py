@@ -45,7 +45,7 @@ class UserCreate(BaseModel):
 
 class UserLogin(BaseModel):
     phone: str
-    password: Optional[str] = None  # For mock auth
+    password: Optional[str] = None
 
 class AdminLogin(BaseModel):
     email: str
@@ -69,7 +69,6 @@ class UserResponse(BaseModel):
     hierarchy_level: Optional[str]
     district: Optional[str]
     state: str
-    profile_image: Optional[str]
     language_preference: str
     trust_score: float
     trust_coins: int
@@ -100,7 +99,6 @@ class ProductCreate(BaseModel):
     stock: int
     min_order_quantity: int = 1
     unit: str = "piece"
-    images: Optional[List[str]] = []
     tags: Optional[List[str]] = []
 
 class ProductUpdate(BaseModel):
@@ -112,7 +110,6 @@ class ProductUpdate(BaseModel):
     stock: Optional[int] = None
     min_order_quantity: Optional[int] = None
     unit: Optional[str] = None
-    images: Optional[List[str]] = None
     tags: Optional[List[str]] = None
     status: Optional[str] = None
     is_featured: Optional[bool] = None
@@ -127,7 +124,6 @@ class ProductResponse(BaseModel):
     stock: int
     min_order_quantity: int
     unit: str
-    images: Optional[List[str]]
     thumbnail: Optional[str]
     status: str
     is_featured: bool
@@ -218,9 +214,9 @@ class MarketAnalysisResponse(BaseModel):
     product_name: str
     category: str
     district: str
-    demand_level: str  # High, Medium, Low
-    demand_score: float  # 0-100
-    demand_trend: str  # Rising, Stable, Falling
+    demand_level: str
+    demand_score: float
+    demand_trend: str
     recommended_price_min: float
     recommended_price_max: float
     average_market_price: float
@@ -320,7 +316,6 @@ class MaterialResponse(BaseModel):
     is_organic: bool
     certifications: Optional[List[str]]
     district: str
-    images: Optional[List[str]]
     supplier: SupplierResponse
 
     class Config:
@@ -416,7 +411,7 @@ class CommunityMemberResponse(BaseModel):
 class CommunityAlertCreate(BaseModel):
     title: str
     message: str
-    target_level: str  # SHG, SLF, TLF, All
+    target_level: str
     district: Optional[str] = None
 
 # ============================================================================
@@ -432,26 +427,6 @@ class ChatResponse(BaseModel):
     agent_triggered: str
     language: str
     session_id: str
-    is_voice_response: bool = False
-    audio_url: Optional[str] = None
-
-class VoiceTranscribeRequest(BaseModel):
-    audio_data: str  # Base64 encoded
-    language: str = "auto"
-
-class VoiceTranscribeResponse(BaseModel):
-    transcription: str
-    detected_language: str
-    confidence: float
-
-class VoiceSynthesizeRequest(BaseModel):
-    text: str
-    language: str = "English"
-    voice: str = "alloy"
-
-class VoiceSynthesizeResponse(BaseModel):
-    audio_url: str
-    duration_seconds: float
 
 # ============================================================================
 # ANALYTICS SCHEMAS
@@ -554,10 +529,10 @@ class AuditLogResponse(BaseModel):
 # REPORT SCHEMAS
 # ============================================================================
 class ReportGenerateRequest(BaseModel):
-    report_type: str  # user, federation, district, market
+    report_type: str
     filters: Dict[str, Any] = {}
     date_range: Optional[Dict[str, str]] = None
-    format: str = "pdf"  # pdf, csv
+    format: str = "pdf"
 
 class ReportResponse(BaseModel):
     report_id: str
@@ -572,7 +547,7 @@ class ReportResponse(BaseModel):
 class NotificationCreate(BaseModel):
     title: str
     message: str
-    type: str = "info"  # info, success, warning, error
+    type: str = "info"
     action_url: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
 
@@ -580,7 +555,7 @@ class BroadcastCreate(BaseModel):
     title: str
     message: str
     notification_type: Optional[str] = "info"
-    target_type: str  # all, users, room
+    target_type: str
     target_users: Optional[List[int]] = None
     target_room: Optional[str] = None
     timestamp: Optional[str] = None

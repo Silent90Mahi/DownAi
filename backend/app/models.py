@@ -64,7 +64,6 @@ class User(Base):
     state = Column(String(50), default="Andhra Pradesh")
     address = Column(Text)
     pincode = Column(String(10))
-    profile_image = Column(String(500))
     language_preference = Column(String(10), default="English")
 
     # Trust System
@@ -806,7 +805,6 @@ class Post(Base):
     post_type = Column(String(50), default="general")
     
     # Media
-    images = Column(JSON)
     video_url = Column(String(500))
     
     # Tags and Category
