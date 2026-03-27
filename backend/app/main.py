@@ -28,7 +28,7 @@ app = FastAPI(
 if settings.ENVIRONMENT == "production":
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=["ooumph.com", "*.ooumph.com", "localhost"]
+        allowed_hosts=["*"]
     )
 
 # CORS middleware - allow localhost and IP-based origins
