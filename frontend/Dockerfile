@@ -52,9 +52,8 @@ COPY --from=dependencies /app/node_modules ./node_modules
 # Copy application code
 COPY . .
 
-# Set empty API URL so frontend uses relative paths (nginx will proxy to backend)
-ARG VITE_API_URL=
-ENV VITE_API_URL=$VITE_API_URL
+ARG VITE_API_BASE_URL=http://localhost:6002
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 # Build the application
 RUN npm run build
