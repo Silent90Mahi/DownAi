@@ -54,7 +54,7 @@ COPY --from=dependencies /usr/local/bin /usr/local/bin
 COPY . .
 
 # Create uploads directory
-RUN mkdir -p /app/uploads/audio /app/uploads/images
+# RUN mkdir -p /app/uploads/audio /app/uploads/images
 
 # Expose port
 EXPOSE 8000
@@ -75,7 +75,7 @@ COPY --from=dependencies /usr/local/bin /usr/local/bin
 COPY . .
 
 # Create uploads directory
-RUN mkdir -p /app/uploads/audio /app/uploads/images
+# RUN mkdir -p /app/uploads/audio /app/uploads/images
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && \
