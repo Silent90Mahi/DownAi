@@ -38,6 +38,20 @@ const Checkout = () => {
     coins_to_use: 0
   });
 
+  
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        delivery_name: prev.delivery_name || user.name || '',
+        delivery_phone: prev.delivery_phone || user.phone || user.mobile || '',
+        delivery_district: prev.delivery_district || user.district || '',
+        delivery_address: prev.delivery_address || user.address || '',
+        delivery_pincode: prev.delivery_pincode || user.pincode || ''
+      }));
+    }
+  }, [user]);
+
   useEffect(() => {
     if (productId) {
       fetchProduct();

@@ -227,7 +227,7 @@ class Order(Base):
 
     # Delivery
     delivery_name = Column(String(100))
-    delivery_phone = Column(String(15))
+    delivery_phone = Column(String(20))
     delivery_address = Column(Text, nullable=False)
     delivery_city = Column(String(50), nullable=False)
     delivery_district = Column(String(50), nullable=False)
