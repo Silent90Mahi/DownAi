@@ -31,18 +31,42 @@ if settings.ENVIRONMENT == "production":
         allowed_hosts=["ooumph.com", "*.ooumph.com", "localhost"]
     )
 
-# CORS middleware - allow all localhost origins in development
+# CORS middleware - allow localhost and IP-based origins
 import re
 
-def is_allowed_origin(origin: str) -> bool:
-    return bool(re.match(r'http://localhost:\d+', origin))
+def is_development_origin(origin: str) -> bool:
+    """Check if origin is allowed in development mode (localhost or any IP)."""
+    if not origin:
+        return False
+    pattern = r"https?://(localhost|127\.0\.0\.1|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?"
+    return bool(re.match(pattern, origin))
+
+def get_cors_config() -> dict:
+    """Get CORS configuration based on environment."""
+    if settings.ENVIRONMENT == "development":
+        return {
+            "allow_origin_regex": r"https?://(localhost|127\.0\.0\.1|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?",
+            "allow_credentials": True,
+            "allow_methods": ["*"],
+            "allow_headers": ["*"],
+        }
+    else:
+        return {
+            "allow_origins": [
+                settings.FRONTEND_URL,
+                "http://localhost:5173",
+                "http://localhost:3000",
+                "http://localhost:6001",
+                "http://localhost:6002",
+            ],
+            "allow_credentials": True,
+            "allow_methods": ["*"],
+            "allow_headers": ["*"],
+        }
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.ENVIRONMENT == "development" else [settings.FRONTEND_URL, "http://localhost:6001"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    **get_cors_config()
 )
 
 # GZip middleware for response compression
