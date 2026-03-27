@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const API_BASE_URL = window.location.hostname === 'localhost' && window.location.port === '5173'
   ? 'http://localhost:6002'
-  : '/api';
+  : '';
 
 // Create axios instance
 const api = axios.create({
