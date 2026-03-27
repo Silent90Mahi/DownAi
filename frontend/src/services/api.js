@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-// API base URL - use relative path in production (Docker) to go through nginx proxy
-// In development, use the direct backend URL
-const API_BASE_URL = 'http://localhost:6002';
+const API_BASE_URL = window.location.hostname === 'localhost' && window.location.port === '5173'
+  ? 'http://localhost:6002'
+  : '/api';
 
 // Create axios instance
 const api = axios.create({
