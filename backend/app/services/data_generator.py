@@ -167,7 +167,6 @@ class DataGenerator:
                 "community_score": community_score,
                 "sustainability_score": sustainability_score,
                 "digital_score": digital_score,
-                "profile_image": f"https://i.pravatar.cc/150?u={i}",
                 "language_preference": random.choice(["English", "Telugu", "Hindi", "Tamil"]),
                 "low_bandwidth_mode": random.choice([True, False]),
                 "notification_enabled": random.choice([True, False]),
