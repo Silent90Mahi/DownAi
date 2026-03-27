@@ -50,10 +50,18 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Mount static files for uploads
-uploads_dir = "uploads"
-os.makedirs(uploads_dir, exist_ok=True)
-os.makedirs(f"{uploads_dir}/audio", exist_ok=True)
-os.makedirs(f"{uploads_dir}/images", exist_ok=True)
+uploads_dir = os.getenv("UPLOADS_DIR", "/app/uploads")
+try:
+    os.makedirs(uploads_dir, exist_ok=True)
+    os.makedirs(f"{uploads_dir}/audio", exist_ok=True)
+    os.makedirs(f"{uploads_dir}/images", exist_ok=True)
+except PermissionError:
+    # Use temp directory if no permission
+    import tempfile
+    uploads_dir = os.path.join(tempfile.gettempdir(), "ooumph_uploads")
+    os.makedirs(uploads_dir, exist_ok=True)
+    os.makedirs(f"{uploads_dir}/audio", exist_ok=True)
+    os.makedirs(f"{uploads_dir}/images", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 # Include all routers
