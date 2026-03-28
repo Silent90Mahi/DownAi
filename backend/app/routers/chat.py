@@ -37,7 +37,7 @@ async def process_message(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Process chat query through agent orchestrator"""
+    """Process chat query through agent orchestrator with platform-first behavior"""
     user_data = {
         "id": current_user.id,
         "phone": current_user.phone,
@@ -50,14 +50,26 @@ async def process_message(
         "role": current_user.role.value
     }
 
+    use_global_search = request.global_search or False
+    agent_override = request.agent_id or None
+    
+    
     response = await process_chat_query(
         request.query,
         user_data,
         db,
-        request.language
+        request.language,
+        agent_override
     )
-
-    return response
+    
+    return schemas.ChatResponse(
+        reply=response.get("reply", ""),
+        agent_triggered=response.get("agent_triggered", "VAANI"),
+        language=response.get("language", "English"),
+        session_id=response.get("session_id", str(uuid.uuid4())),
+        needs_global_search=response.get("needs_global_search", False),
+        is_fallback=response.get("is_fallback", False),
+    )
 
 @router.get("/history")
 async def get_chat_history(

@@ -743,11 +743,15 @@ class ChatHistory(Base):
     # Language
     language = Column(String(10), default="English")
 
+    # Global Search State
+    global_search_allowed = Column(Boolean, default=None)
+    awaiting_global_search_confirmation = Column(Boolean, default=False)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    user = relationship("User")
+    user = relationship("User", back_populates="chat_history")
 
 
 class SyncStatus(str, enum.Enum):

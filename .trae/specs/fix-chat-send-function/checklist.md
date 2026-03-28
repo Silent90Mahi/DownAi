@@ -1,0 +1,3 @@
+- [ ] chatAPI.send method exists and accepts 3 parameters
+- [ ] ChatAssistant.jsx calls chatAPI.sendMessage correctly
+- [ ] No "za.send is not a function" error in console

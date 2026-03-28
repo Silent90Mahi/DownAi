@@ -4,6 +4,7 @@ Environment-based configuration for production-ready deployment
 """
 from pydantic_settings import BaseSettings
 from typing import Optional
+import re
 
 
 class Settings(BaseSettings):
@@ -20,6 +21,17 @@ class Settings(BaseSettings):
     # ============= API KEYS =============
     OPENAI_API_KEY: str
     ONDC_API_KEY: Optional[str] = None
+
+    def validate_openai_key(self) -> None:
+        """Validate OpenAI API key format."""
+        if not self.OPENAI_API_KEY:
+            raise ValueError("OPENAI_API_KEY is required")
+        pattern = r'^sk-proj-[A-Za-z0-9_-]{20,}$'
+        if not re.match(pattern, self.OPENAI_API_KEY):
+            raise ValueError(
+                "Invalid OPENAI_API_KEY format. "
+                "Key should start with 'sk-proj-' followed by alphanumeric characters."
+            )
     GEM_API_KEY: Optional[str] = None
     ESARAS_API_KEY: Optional[str] = None
     RTGS_API_KEY: Optional[str] = None
@@ -98,7 +110,8 @@ def validate_settings() -> None:
             f"Please set these in your .env file."
         )
 
-    # Warn if using default secret key
+    settings.validate_openai_key()
+
     if settings.SECRET_KEY == "ooumph_secret_key_change_in_production":
         if settings.ENVIRONMENT == "production":
             raise ValueError(

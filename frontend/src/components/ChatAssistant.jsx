@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, X, Bot, Loader2, History, TrendingUp, Users, Heart, Wallet, HelpCircle, Package } from 'lucide-react';
+import { MessageSquare, Send, X, Bot, Loader2, History, TrendingUp, Users, Heart, Wallet, HelpCircle, Package, Globe, Search } from 'lucide-react';
 import { chatAPI } from '../services/api';
 
 const AGENTS = [
@@ -44,6 +44,9 @@ const ChatAssistant = () => {
   const [currentResponse, setCurrentResponse] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState(null);
+  const [globalSearchMode, setGlobalSearchMode] = useState(false);
+  const [showGlobalSearchPrompt, setShowGlobalSearchPrompt] = useState(false);
+  const [pendingQuery, setPendingQuery] = useState('');
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -115,23 +118,47 @@ const ChatAssistant = () => {
     localStorage.removeItem('chatHistory');
   };
 
-  const handleSend = async (e) => {
+  const handleSend = async (e, forceGlobalSearch = false) => {
     e.preventDefault();
-    if (!message.trim() || loading) return;
+    if (!message.trim() && !pendingQuery) return;
 
-    const userMessage = message.trim();
+    const userMessage = (forceGlobalSearch ? pendingQuery : message).trim();
+    if (!userMessage || loading) return;
+
     setMessage('');
+    setShowGlobalSearchPrompt(false);
+    setPendingQuery('');
     setChatLog(prev => [...prev, { role: 'user', content: userMessage }]);
     setLoading(true);
     setError(null);
     setCurrentResponse('');
     setStreaming(true);
 
+    const useGlobalSearch = forceGlobalSearch || globalSearchMode;
+
     try {
-      const response = await chatAPI.send(userMessage, selectedAgent.id, language);
-      const assistantMessage = response.data.response || response.data.message || 'I understand your request. How can I help you further?';
-      setChatLog(prev => [...prev, { role: 'assistant', content: assistantMessage, agent: selectedAgent.id }]);
-      saveToHistory([...chatLog, { role: 'user', content: userMessage }, { role: 'assistant', content: assistantMessage, agent: selectedAgent.id }]);
+      const response = await chatAPI.send(userMessage, selectedAgent.id, language, useGlobalSearch);
+      const assistantMessage = response.data.reply || response.data.response || response.data.message || 'I understand your request. How can I help you further?';
+      const needsGlobalSearch = response.data.needs_global_search || false;
+
+      if (needsGlobalSearch && !useGlobalSearch) {
+        setPendingQuery(userMessage);
+        setShowGlobalSearchPrompt(true);
+        setChatLog(prev => [...prev, { 
+          role: 'assistant', 
+          content: "I couldn't find any data on the platform for your query. Would you like me to search globally across the web?",
+          agent: selectedAgent.id,
+          isGlobalSearchPrompt: true
+        }]);
+      } else {
+        setChatLog(prev => [...prev, { 
+          role: 'assistant', 
+          content: assistantMessage, 
+          agent: selectedAgent.id,
+          isGlobalSearch: useGlobalSearch
+        }]);
+        saveToHistory([...chatLog, { role: 'user', content: userMessage }, { role: 'assistant', content: assistantMessage, agent: selectedAgent.id }]);
+      }
     } catch (err) {
       setError(err);
       setChatLog(prev => [...prev, { role: 'assistant', content: getErrorMessage(err), isError: true }]);
@@ -140,6 +167,16 @@ const ChatAssistant = () => {
       setStreaming(false);
       setCurrentResponse('');
     }
+  };
+
+  const handleGlobalSearchConfirm = () => {
+    const fakeEvent = { preventDefault: () => {} };
+    handleSend(fakeEvent, true);
+  };
+
+  const handleGlobalSearchCancel = () => {
+    setShowGlobalSearchPrompt(false);
+    setPendingQuery('');
   };
 
   const FAB_BOTTOM = 90;
@@ -293,11 +330,69 @@ const ChatAssistant = () => {
                   color: msg.isError ? '#fca5a5' : msg.role === 'user' ? '#fff' : 'var(--text-secondary)',
                 }}>
                   {msg.agent && (
-                    <div style={{ fontSize: '0.65rem', fontWeight: 700, color: selectedAgent.color, marginBottom: 3 }}>
-                      🤖 {AGENTS.find(a => a.id === msg.agent)?.name || msg.agent}
+                    <div style={{ fontSize: '0.65rem', fontWeight: 700, color: selectedAgent.color, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span>🤖 {AGENTS.find(a => a.id === msg.agent)?.name || msg.agent}</span>
+                      {msg.isGlobalSearch && (
+                        <span style={{ 
+                          background: 'rgba(59, 130, 246, 0.2)', 
+                          color: '#60a5fa', 
+                          padding: '1px 6px', 
+                          borderRadius: 4, 
+                          fontSize: '0.6rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 3
+                        }}>
+                          <Globe size={10} /> Global Search
+                        </span>
+                      )}
                     </div>
                   )}
                   <div style={{ whiteSpace: 'pre-line' }}>{msg.content}</div>
+                  {msg.isGlobalSearchPrompt && (
+                    <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={handleGlobalSearchConfirm}
+                        disabled={loading}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          padding: '6px 12px',
+                          background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                          border: 'none',
+                          borderRadius: 8,
+                          color: '#fff',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          opacity: loading ? 0.5 : 1,
+                        }}
+                      >
+                        <Globe size={14} />
+                        Search Globally
+                      </button>
+                      <button
+                        onClick={handleGlobalSearchCancel}
+                        disabled={loading}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          padding: '6px 12px',
+                          background: 'rgba(255,255,255,0.08)',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          borderRadius: 8,
+                          color: 'var(--text-secondary)',
+                          fontSize: '0.75rem',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          opacity: loading ? 0.5 : 1,
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -340,12 +435,48 @@ const ChatAssistant = () => {
           <form onSubmit={handleSend} style={{
             padding: '0.6rem 0.8rem', borderTop: `1px solid ${selectedAgent.color}15`,
             background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 8,
+            position: 'relative',
           }}>
+            {globalSearchMode && (
+              <div style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                right: 0,
+                background: 'rgba(59, 130, 246, 0.1)',
+                borderBottom: '1px solid rgba(59, 130, 246, 0.3)',
+                padding: '4px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: '0.7rem',
+                color: '#60a5fa',
+              }}>
+                <Globe size={12} />
+                <span>Global search mode enabled</span>
+              </div>
+            )}
             <input type="text" value={message} onChange={(e) => setMessage(e.target.value)} placeholder={`Ask ${selectedAgent.name}...`} style={{
               flex: 1, padding: '0.5rem 0.8rem', background: 'rgba(255,255,255,0.06)',
               border: `1px solid ${selectedAgent.color}20`, borderRadius: 99, outline: 'none',
               color: 'var(--text-primary)', fontSize: '0.8rem', transition: 'all 0.2s',
             }} />
+
+            <button
+              type="button"
+              onClick={() => setGlobalSearchMode(!globalSearchMode)}
+              title={globalSearchMode ? 'Disable global search' : 'Enable global search'}
+              style={{
+                width: 34, height: 34, borderRadius: '50%', border: 'none',
+                background: globalSearchMode ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'rgba(255,255,255,0.06)',
+                color: globalSearchMode ? '#fff' : 'var(--text-muted)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', flexShrink: 0,
+                transition: 'all 0.2s',
+              }}
+            >
+              <Globe size={14} />
+            </button>
 
             <button type="submit" disabled={loading || !message.trim()} style={{
               width: 34, height: 34, borderRadius: '50%', border: 'none',

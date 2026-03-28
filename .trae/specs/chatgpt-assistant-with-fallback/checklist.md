@@ -1,0 +1,21 @@
+- [x] VAANI agent system prompt enforces platform-only responses
+- [x] BAZAAR agent checks platform market data before global search
+- [x] JODI agent fetches and displays actual user order data
+- [x] SAMagri agent searches platform suppliers first
+- [x] sampark agent checks community data first
+- [x] vishwas agent fetches and displays actual wallet data
+- [x] Global search confirmation dialog implemented correctly
+- [x] User can confirm global search with "yes", "sure", "okay"
+- [x] User can decline global search with "no", "cancel"
+- [x] Platform data detection function works correctly
+- [x] Local fallback system activates when ChatGPT API fails
+- [x] Fallback responses are contextually rich and helpful
+- [x] API key stored securely in environment variables
+- [x] Error handling logs failures without exposing secrets
+- [x] Graceful degradation maintains chat functionality during API issues
+- [x] Frontend displays global search confirmation UI
+- [x] Chat assistant works correctly with new platform-first behavior
+- [x] All 6 agents respond only about platform data by default
+- [x] Global search only offered when no platform data found
+- [x] Local fallback provides helpful responses during API failures
+- [x] End-to-end testing confirms full functionality

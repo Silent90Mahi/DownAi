@@ -63,6 +63,8 @@ export const authAPI = {
 export const chatAPI = {
   sendMessage: (query, language = 'English') =>
     api.post('/api/chat/process', { query, language }),
+  send: (query, agentId = 'VAANI', language = 'English', globalSearch = false) =>
+    api.post('/api/chat/process', { query, agent_id: agentId, language, global_search: globalSearch }),
   getHistory: (limit = 50) => api.get(`/api/chat/history?limit=${limit}`),
 };
 

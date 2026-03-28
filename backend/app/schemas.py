@@ -420,13 +420,22 @@ class CommunityAlertCreate(BaseModel):
 class ChatRequest(BaseModel):
     query: str
     language: str = "English"
+    agent_id: Optional[str] = None
     session_id: Optional[str] = None
+    global_search: bool = False
+    needs_global_search: bool = False
+    is_fallback: bool = False
+    platform_data: Optional[Dict[str, Any]] = None
+
 
 class ChatResponse(BaseModel):
     reply: str
     agent_triggered: str
     language: str
     session_id: str
+    needs_global_search: bool = False
+    is_fallback: bool = False
+    platform_data: Optional[Dict[str, Any]] = None
 
 # ============================================================================
 # ANALYTICS SCHEMAS
